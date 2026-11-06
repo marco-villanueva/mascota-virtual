@@ -99,7 +99,7 @@ const PHRASES = {
 // =============================
 // Anim durations (seconds)
 // =============================
-const ANIM_DUR = { eat: 1.6, clean: 1.4, game: 4, vaccine: 2.6 };
+const ANIM_DUR = { eat: 1.6, clean: 2.6, game: 4, vaccine: 2.6 };
 
 // =============================
 // Helpers
@@ -220,16 +220,198 @@ function busy() {
   return pet.anim !== null;
 }
 
-function feed() {
+// =============================
+// Food menu and eating
+// =============================
+const FOODS = ["carne", "sushi", "pasta", "huevo", "helado", "pastel", "manzana"];
+
+const FOOD_LABELS = {
+  carne: "Carne",
+  sushi: "Sushi",
+  pasta: "Pasta",
+  huevo: "Huevo",
+  helado: "Helado",
+  pastel: "Pastel",
+  manzana: "Manzana",
+};
+
+const FOOD_PHRASES = {
+  carne:   ["¡Ñam! ¡Poderosa proteína!", "¡Bifecito al punto!", "¡Qué sustancioso!"],
+  sushi:   ["¡Sushi, mi favorito! ¡Ñam!", "¡Arroz y salmón, delicia!", "¡Qué finura!"],
+  pasta:   ["¡Fiditos enroladitos! ¡Ñam!", "¡Slurp! ¡Salsa por todos lados!", "¡Pasta power!"],
+  huevo:   ["¡Huevito frito! ¡Ñam!", "¡La yema doradita!", "¡Plop! ¡De un mordisco!"],
+  helado:  ["¡Fresito y helado! ¡Brrr!", "¡Lambus lambo!", "¡Se me congela la naricita!"],
+  pastel:  ["¡Pastel! ¡Día de fiesta!", "¡Dulzura máxima!", "¡Con frallita arriba!"],
+  manzana: ["¡Crunch, crunch!", "¡Frutita saludable!", "¡De un mordiscote!"],
+};
+
+const foodMenuEl = document.getElementById("food-menu");
+
+function eatFood(food) {
+  hideFoodMenu();
   if (busy() || pet.dead || pet.sleeping || evol.stage === "egg" || STATS.hunger >= 99) return;
-  pet.anim = { type: "eat", start: nowSec };
+  pet.anim = { type: "eat", food, start: nowSec };
   STATS.hunger = clamp(STATS.hunger + 22, 0, 100);
   playSfx("eat", ANIM_DUR.eat);
-  say(pick(["¡Ñam ñam!", "¡Qué rico!", "¡Delicioso!"]));
+  say(pick(FOOD_PHRASES[food]));
   spawnBurst("heart", 5);
   addXp(1);
   updateBars();
   disableButtons(ANIM_DUR.eat);
+}
+
+function toggleFoodMenu() {
+  if (busy() || pet.dead || pet.sleeping || evol.stage === "egg") return;
+  hideGameMenu();
+  foodMenuEl.hidden = !foodMenuEl.hidden;
+}
+
+function hideFoodMenu() {
+  foodMenuEl.hidden = true;
+}
+
+function buildFoodMenu() {
+  FOODS.forEach((food) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "game-item";
+    btn.dataset.food = food;
+    const ic = document.createElement("canvas");
+    ic.className = "gi-icon";
+    const label = document.createElement("span");
+    label.textContent = FOOD_LABELS[food];
+    btn.append(ic, label);
+    btn.addEventListener("click", () => eatFood(food));
+    foodMenuEl.appendChild(btn);
+    renderFoodIcon(ic, food);
+  });
+}
+
+// Food sprites in a 100x100 box centered on (50, 55). Shared by the menu
+// icons and the big cartoon shown while the pet is eating.
+function drawFoodCartoon(gc, id) {
+  gc.save();
+  gc.lineJoin = "round";
+  gc.lineCap = "round";
+  const OUT = "#4a3540";
+
+  if (id === "carne") {
+    gc.translate(50, 55); gc.rotate(-0.14); gc.translate(-50, -55);
+    gc.fillStyle = "#f2846e";
+    gc.beginPath(); gc.roundRect(16, 34, 68, 42, 18); gc.fill();
+    gc.strokeStyle = OUT; gc.lineWidth = 4.5; gc.stroke();
+    gc.fillStyle = "#ffc3b0";
+    gc.beginPath(); gc.roundRect(25, 42, 50, 26, 12); gc.fill();
+    gc.strokeStyle = "#d95f52"; gc.lineWidth = 5;
+    for (let i = 0; i < 3; i++) {
+      gc.beginPath();
+      gc.moveTo(33 + i * 14, 44); gc.lineTo(25 + i * 14, 66);
+      gc.stroke();
+    }
+  } else if (id === "sushi") {
+    gc.fillStyle = "#fff7ef";
+    gc.beginPath(); gc.ellipse(50, 64, 30, 15, 0, 0, Math.PI * 2); gc.fill();
+    gc.strokeStyle = "#e5d4c8"; gc.lineWidth = 3.5; gc.stroke();
+    gc.fillStyle = "#ff9d7e";
+    gc.beginPath(); gc.ellipse(50, 51, 30, 13, 0.04, 0, Math.PI * 2); gc.fill();
+    gc.strokeStyle = OUT; gc.lineWidth = 4; gc.stroke();
+    gc.strokeStyle = "#ffd4c8"; gc.lineWidth = 3.5;
+    for (const x of [38, 50, 62]) {
+      gc.beginPath(); gc.moveTo(x - 4, 43); gc.lineTo(x + 2, 57); gc.stroke();
+    }
+  } else if (id === "pasta") {
+    gc.strokeStyle = "#e8b84b"; gc.lineWidth = 5;
+    for (const [x1, y1, x2, y2] of [[24, 52, 48, 44], [38, 48, 62, 50], [52, 54, 76, 46], [28, 58, 70, 56]]) {
+      gc.beginPath(); gc.moveTo(x1, y1); gc.quadraticCurveTo((x1 + x2) / 2, y1 - 12, x2, y2); gc.stroke();
+    }
+    gc.fillStyle = "#e2604f";
+    gc.beginPath(); gc.ellipse(50, 60, 22, 10, 0, 0, Math.PI * 2); gc.fill();
+    gc.strokeStyle = OUT; gc.lineWidth = 3.5; gc.stroke();
+    gc.fillStyle = "#8a4a3a";
+    for (const [mx, my] of [[42, 58], [54, 62], [62, 57], [48, 54]]) {
+      gc.beginPath(); gc.arc(mx, my, 2.6, 0, Math.PI * 2); gc.fill();
+    }
+    gc.fillStyle = "#fdf4fa";
+    gc.beginPath(); gc.arc(50, 62, 27, 0, Math.PI); gc.closePath(); gc.fill();
+    gc.strokeStyle = "#e0aecc"; gc.lineWidth = 4; gc.stroke();
+    gc.fillStyle = "#f4a7c3";
+    gc.beginPath(); gc.ellipse(50, 62, 27, 5.5, 0, 0, Math.PI); gc.fill();
+  } else if (id === "huevo") {
+    gc.fillStyle = "#ffffff";
+    gc.beginPath();
+    gc.moveTo(16, 60);
+    gc.quadraticCurveTo(20, 42, 50, 40);
+    gc.quadraticCurveTo(84, 42, 84, 60);
+    gc.quadraticCurveTo(80, 76, 50, 76);
+    gc.quadraticCurveTo(20, 76, 16, 60);
+    gc.fill();
+    gc.strokeStyle = "#e5d4c8"; gc.lineWidth = 3.5; gc.stroke();
+    gc.fillStyle = "#ffc94d";
+    gc.beginPath(); gc.arc(50, 58, 11, 0, Math.PI * 2); gc.fill();
+    gc.strokeStyle = "#f0a92e"; gc.lineWidth = 3; gc.stroke();
+    gc.fillStyle = "rgba(255,255,255,0.75)";
+    gc.beginPath(); gc.arc(46.5, 54.5, 3, 0, Math.PI * 2); gc.fill();
+  } else if (id === "helado") {
+    gc.fillStyle = "#e7b06a";
+    gc.beginPath(); gc.moveTo(34, 56); gc.lineTo(50, 90); gc.lineTo(66, 56); gc.closePath(); gc.fill();
+    gc.strokeStyle = "#c98d47"; gc.lineWidth = 3; gc.stroke();
+    gc.strokeStyle = "rgba(255,255,255,0.8)"; gc.lineWidth = 2.5;
+    for (const o of [-6, 0, 6]) {
+      gc.beginPath(); gc.moveTo(38 + o, 62); gc.lineTo(52 + o * 0.4, 82); gc.stroke();
+      gc.beginPath(); gc.moveTo(62 + o, 62); gc.lineTo(48 + o * 0.4, 82); gc.stroke();
+    }
+    gc.fillStyle = "#ffffff";
+    gc.beginPath(); gc.arc(50, 49, 13, 0, Math.PI * 2); gc.fill();
+    gc.fillStyle = "#f9a8c8";
+    gc.beginPath(); gc.arc(40, 38, 11, 0, Math.PI * 2); gc.fill();
+    gc.beginPath(); gc.arc(60, 38, 11, 0, Math.PI * 2); gc.fill();
+    gc.strokeStyle = "#d888a6"; gc.lineWidth = 3;
+    gc.beginPath(); gc.arc(40, 38, 11, 0, Math.PI * 2); gc.stroke();
+    gc.beginPath(); gc.arc(60, 38, 11, 0, Math.PI * 2); gc.stroke();
+    gc.beginPath(); gc.arc(50, 49, 13, 0, Math.PI * 2); gc.stroke();
+    gc.fillStyle = "#e0413f";
+    gc.beginPath(); gc.arc(50, 25, 5.5, 0, Math.PI * 2); gc.fill();
+    gc.strokeStyle = "#8a2f2e"; gc.lineWidth = 2.5;
+    gc.beginPath(); gc.moveTo(50, 19); gc.quadraticCurveTo(52, 15, 55, 16); gc.stroke();
+  } else if (id === "pastel") {
+    gc.fillStyle = "#f7c26b";
+    gc.beginPath(); gc.roundRect(24, 46, 52, 36, 8); gc.fill();
+    gc.fillStyle = "#fff7f2";
+    gc.beginPath(); gc.roundRect(24, 62, 52, 9, 4); gc.fill();
+    gc.fillStyle = "#f48fb1";
+    gc.beginPath(); gc.roundRect(22, 36, 56, 15, 7); gc.fill();
+    for (const x of [32, 44, 58, 70]) {
+      gc.beginPath(); gc.arc(x, 51, 4, 0, Math.PI * 2); gc.fill();
+    }
+    gc.strokeStyle = "#c77b52"; gc.lineWidth = 3;
+    gc.beginPath(); gc.roundRect(24, 46, 52, 36, 8); gc.stroke();
+    gc.fillStyle = "#e0413f";
+    gc.beginPath(); gc.arc(50, 32, 5.5, 0, Math.PI * 2); gc.fill();
+  } else { // manzana
+    gc.fillStyle = "#e8595c";
+    gc.beginPath(); gc.arc(38, 58, 20, 0, Math.PI * 2); gc.fill();
+    gc.beginPath(); gc.arc(62, 58, 20, 0, Math.PI * 2); gc.fill();
+    gc.beginPath(); gc.ellipse(50, 50, 15, 12, 0, 0, Math.PI * 2); gc.fill();
+    gc.strokeStyle = "#7a4a2a"; gc.lineWidth = 4;
+    gc.beginPath(); gc.moveTo(50, 46); gc.quadraticCurveTo(53, 36, 58, 32); gc.stroke();
+    gc.fillStyle = "#7cb95c";
+    gc.beginPath(); gc.ellipse(65, 32, 8, 4.5, -0.5, 0, Math.PI * 2); gc.fill();
+    gc.fillStyle = "rgba(255,255,255,0.65)";
+    gc.beginPath(); gc.ellipse(34, 50, 4, 7, -0.5, 0, Math.PI * 2); gc.fill();
+  }
+
+  gc.restore();
+}
+
+// Menu icon: the same cartoon scaled into a 26px canvas
+function renderFoodIcon(canvasEl, food) {
+  const dpr = 2;
+  const S = 26;
+  canvasEl.width = S * dpr;
+  canvasEl.height = S * dpr;
+  const ic = canvasEl.getContext("2d");
+  ic.setTransform((S * dpr) / 100, 0, 0, (S * dpr) / 100, 0, 0);
+  drawFoodCartoon(ic, food);
 }
 
 const GAME_PHRASES = {
@@ -261,6 +443,7 @@ const gameMenuEl = document.getElementById("game-menu");
 
 function toggleGameMenu() {
   if (busy() || pet.dead || pet.sleeping || evol.stage === "egg") return;
+  hideFoodMenu();
   gameMenuEl.hidden = !gameMenuEl.hidden;
 }
 
@@ -314,9 +497,8 @@ function clean() {
   if (busy() || pet.dead || pet.sleeping || evol.stage === "egg" || STATS.hygiene >= 99) return;
   pet.anim = { type: "clean", start: nowSec };
   STATS.hygiene = clamp(STATS.hygiene + 60, 0, 100);
-  playSfx("clean");
-  say(pick(["¡Reluciente!", "¡Fresquito!", "¡Gracias!"]));
-  spawnBurst("sparkle", 10);
+  playSfx("clean", ANIM_DUR.clean); // bubbling soundtrack while the shower runs
+  say(pick(["¡Aguacita, aguacita! 🚿", "¡Burbujitas tan ricotas!", "¡Agüita templada!"]));
   addXp(1);
   updateBars();
   disableButtons(ANIM_DUR.clean);
@@ -367,6 +549,7 @@ function die() {
   pet.targetX = pet.x;
   buttons.sleep.querySelector("span").textContent = "Dormir";
   hideGameMenu();
+  hideFoodMenu();
   mood = "dead";
   say(pick(["¡Ay no! ¿" + settings.name + "? 💫", "x_x", "*" + settings.name + " se desmayó...*"]), 5);
   spawnBurst("sparkle", 10);
@@ -539,6 +722,108 @@ function drawPet(t) {
   g.scale(sx * s * pet.facing, sy * s);
   g.translate(-50, -100); // body coordinate space: 100w x 100h baseline at feet
   drawBodyCore({ t, sleeping: pet.sleeping, eyeOpen, sad: faceSad, eating, happy: mood === "happy" || playing });
+  g.restore();
+
+  // The cartoon food being eaten hovers by the mouth, wobbling and
+  // shrinking with every bite until it is gone.
+  if (pet.anim?.type === "eat") {
+    const e = clamp((t - pet.anim.start) / ANIM_DUR.eat, 0, 1);
+    const dir = pet.facing >= 0 ? 1 : -1;
+    const k = 0.52 * s * (1 - 0.62 * e);
+    g.save();
+    g.globalAlpha = e > 0.85 ? (1 - e) / 0.15 : 1;
+    g.translate(c.x + dir * (30 * s + 16), c.y - 30 * s + Math.sin(t * 21) * 2);
+    g.rotate(dir * Math.sin(e * 14) * 0.18);
+    g.scale(k, k);
+    g.translate(-50, -55);
+    drawFoodCartoon(g, pet.anim.food);
+    g.restore();
+  }
+
+  // The shower hangs above her while the clean animation runs
+  if (pet.anim?.type === "clean") {
+    drawShower(t - pet.anim.start, s, c);
+  }
+}
+
+// A cute shower head on a gooseneck arm slides in from the right, tilts
+// over the pet and rains a fan of little droplets; then it slips away.
+function drawShower(e, s, c) {
+  const D = ANIM_DUR.clean;
+  const inK = clamp(e / 0.35, 0, 1);
+  const ss = inK * inK * (3 - 2 * inK); // smoothstep slide-in from the right
+  const outK = clamp((e - (D - 0.5)) / 0.5, 0, 1);
+  const alpha = Math.min(ss * 1.7, 1) * (1 - outK * outK);
+  const ox = (1 - ss) * 200 * s; // starts off to the right and eases into place
+
+  const hx = c.x + 18 * s + ox; // head center
+  const hy = c.y - 136 * s;     // head height, comfortably above the pet
+
+  g.save();
+  g.globalAlpha = alpha;
+  g.lineCap = "round";
+
+  // Arm: pipe entering from the top, curving down to the head
+  g.strokeStyle = "#b9a6d6";
+  g.lineWidth = 7 * s;
+  g.beginPath();
+  g.moveTo(hx + 64 * s, c.y - 210 * s);
+  g.quadraticCurveTo(hx + 64 * s, hy - 42 * s, hx + 12 * s, hy - 12 * s);
+  g.stroke();
+
+  // Head: rounded faceplate, tilted toward the pet, with tiny holes
+  g.save();
+  g.translate(hx, hy);
+  g.rotate((pet.facing >= 0 ? 1 : -1) * 0.42);
+  g.fillStyle = "#cdbcec";
+  g.strokeStyle = "#8f7cb8";
+  g.lineWidth = 3 * s;
+  g.beginPath();
+  g.roundRect(-26 * s, -10 * s, 52 * s, 22 * s, 9 * s);
+  g.fill();
+  g.stroke();
+  g.fillStyle = "#8f7cb8";
+  for (let i = -2; i <= 2; i++) {
+    for (let j = 0; j < 2; j++) {
+      g.beginPath();
+      g.arc(i * 8 * s, -1 * s + j * 8 * s, 1.7 * s, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  g.restore();
+
+  // Water: a soft fan of droplets falls while the shower is on
+  if (e > 0.35 && e < 2.1) {
+    const wFade = 1 - clamp((e - 1.85) / 0.25, 0, 1); // last drops thin out
+    g.globalAlpha = alpha * wFade;
+    for (let i = 0; i < 16; i++) {
+      const spin = i * 2.399; // golden-angle spread for an even fan
+      const fanX = Math.sin(spin) * 27 * s;
+      const phase = (e * (1.5 + (i % 4) * 0.22) + i * 0.37) % 1;
+      const px = hx + fanX;
+      const py = hy + 10 * s + phase * 74 * s;
+      g.fillStyle = "rgba(126, 196, 235, 0.85)";
+      g.beginPath();
+      g.ellipse(px, py, 1.8 * s, 3.2 * s, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+
+    // A few soap bubbles floating up around her
+    g.strokeStyle = "rgba(190, 224, 247, 0.95)";
+    g.fillStyle = "rgba(255, 255, 255, 0.8)";
+    for (let i = 0; i < 4; i++) {
+      const phase = (e * 0.38 + i * 0.26) % 1;
+      const bpx = c.x + Math.sin(i * 1.7 + e * 1.2) * 26 * s + (i - 1.5) * 16 * s;
+      const bpy = c.y - 22 * s - phase * 66 * s;
+      const br = (3 + (i % 2) * 1.6) * s;
+      g.beginPath();
+      g.arc(bpx, bpy, br, 0, Math.PI * 2);
+      g.stroke();
+      g.beginPath();
+      g.arc(bpx - br * 0.35, bpy - br * 0.35, br * 0.3, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
   g.restore();
 }
 
@@ -1162,8 +1447,14 @@ function updateBehavior(dt) {
 
   // End of anim
   if (pet.anim && t - pet.anim.start > ANIM_DUR[pet.anim.type]) {
+    const ended = pet.anim;
     pet.anim = null;
     updateButtonsState();
+    // The shower promises its shine: it comes right after the last drop
+    if (ended.type === "clean") {
+      spawnBurst("sparkle", 14);
+      say(pick(["¡Reluciente! ✨", "¡Fresita y limpita!", "¡Brillo de estrellita!"]), 2.8);
+    }
   }
 
   // Wandering (a fainted pet stays put)
@@ -1525,15 +1816,17 @@ function frame(ms) {
 // =============================
 // Input wiring
 // =============================
-buttons.feed.addEventListener("click", feed);
+buttons.feed.addEventListener("click", toggleFoodMenu);
 buttons.play.addEventListener("click", toggleGameMenu);
 buttons.clean.addEventListener("click", clean);
 buttons.sleep.addEventListener("click", toggleSleep);
 
-// Close the games popover when clicking anywhere else
+// Close the popovers when clicking anywhere else
 document.addEventListener("click", (e) => {
-  if (!gameMenuEl.hidden && !gameMenuEl.contains(e.target) && !buttons.play.contains(e.target)) {
-    hideGameMenu();
+  for (const [menu, btn] of [[gameMenuEl, buttons.play], [foodMenuEl, buttons.feed]]) {
+    if (!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) {
+      menu.hidden = true;
+    }
   }
 });
 
@@ -1560,7 +1853,7 @@ canvas.addEventListener("click", () => {
 document.addEventListener("keydown", (e) => {
   if (e.repeat) return;
   const k = e.key.toLowerCase();
-  if (k === "f") feed();
+  if (k === "f") toggleFoodMenu();
   else if (k === "p") toggleGameMenu();
   else if (k === "c") clean();
   else if (k === "s") toggleSleep();
@@ -1575,6 +1868,7 @@ resizeCanvas();
 loadGame();          // restore saved settings before building the panel
 buildSettingsUI();
 buildGameMenu();
+buildFoodMenu();
 applySoundIcon();    // restore mute state from the save
 updateNameUI();
 updateEvolutionUI();
