@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mascota Virtual</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="scene">
+    <header class="header">
+      <button id="btn-sound" class="gear sound-gear" type="button" aria-label="Silenciar">🔊</button>
+      <button id="btn-settings" class="gear" type="button" aria-label="Configuración">⚙️</button>
+      <h1><span id="pet-name">Mochi</span> <span class="pet-emoji" aria-hidden="true">🐾</span></h1>
+      <p class="subtitle">Tu pequeña mascota virtual</p>
+    </header>
+
+    <div class="stage">
+      <canvas id="pet-canvas"></canvas>
+      <div id="night-overlay" aria-hidden="true">
+        <span class="night-sky"></span>
+        <span class="day-sun">☀️</span>
+        <span class="night-moon">🌙</span>
+        <span class="night-star s1">✦</span>
+        <span class="night-star s2">✦</span>
+        <span class="night-star s3">✦</span>
+        <span class="night-star s4">✦</span>
+        <span class="night-star s5">✦</span>
+      </div>
+      <div id="evol-badge" class="stage-badge" hidden></div>
+      <button id="btn-revive" class="revive-btn" hidden>
+        <span class="revive-emoji">💉</span>
+        <strong>Botiquín</strong>
+        <em>Toca para revivir con primeros auxilios</em>
+      </button>
+      <div id="bubble" class="bubble" hidden></div>
+    </div>
+
+    <section class="stats" aria-label="Estado de la mascota">
+      <div class="stat-row">
+        <span class="stat-icon">🍎</span>
+        <div class="stat-bar"><div id="bar-hunger" class="stat-fill"></div></div>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">😄</span>
+        <div class="stat-bar"><div id="bar-happiness" class="stat-fill"></div></div>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">⚡</span>
+        <div class="stat-bar"><div id="bar-energy" class="stat-fill"></div></div>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">✨</span>
+        <div class="stat-bar"><div id="bar-hygiene" class="stat-fill"></div></div>
+      </div>
+    </section>
+
+    <section class="actions" aria-label="Acciones de la mascota">
+      <div id="game-menu" class="game-menu" hidden>
+        <button class="game-item" data-game="ball" type="button"><canvas class="gi-icon"></canvas><span>Pelota</span></button>
+        <button class="game-item" data-game="slide" type="button"><canvas class="gi-icon"></canvas><span>Tobogán</span></button>
+        <button class="game-item" data-game="seesaw" type="button"><canvas class="gi-icon"></canvas><span>Sube y baja</span></button>
+        <button class="game-item" data-game="swing" type="button"><canvas class="gi-icon"></canvas><span>Columpio</span></button>
+      </div>
+      <button id="btn-feed" class="action-btn">🍎<span>Comer</span></button>
+      <button id="btn-play" class="action-btn">🎾<span>Jugar</span></button>
+      <button id="btn-clean" class="action-btn">🧼<span>Baño</span></button>
+      <button id="btn-sleep" class="action-btn">🌙<span>Dormir</span></button>
+    </section>
+
+    <p class="hint">Teclas rápidas: <kbd>F</kbd> <kbd>P</kbd> <kbd>C</kbd> <kbd>S</kbd> — P abre los minijuegos y un clic en tu mascota la saluda</p>
+  </main>
+
+  <div id="settings" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>⚙️ Configuración</h2>
+        <button id="btn-close" class="close" type="button" aria-label="Cerrar">✕</button>
+      </div>
+
+      <label class="field">
+        <span class="field-label">Nombre de tu mascota</span>
+        <input id="input-name" maxlength="12" placeholder="Mochi" />
+      </label>
+
+      <div class="field">
+        <span class="field-label">Color de fondo</span>
+        <div id="swatches" class="swatches"></div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Personaje</span>
+        <div id="chars" class="chars"></div>
+      </div>
+
+      <button id="btn-done" class="done-btn" type="button">Listo</button>
+      <button id="btn-reset" class="danger-btn secondary" type="button">🗑️ Reiniciar partida</button>
+    </div>
+  </div>
+
+  <div id="confirm-reset" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>⚠️ Reiniciar partida</h2>
+        <button id="btn-cancel-reset-x" class="close" type="button" aria-label="Cancelar">✕</button>
+      </div>
+      <p class="confirm-text">Esto borrará <strong>todo</strong> el progreso: nombre, personaje, fondo, estadísticas y crecimiento (tu mascota volverá a ser un huevo). Esta acción no se puede deshacer.</p>
+      <div class="confirm-actions">
+        <button id="btn-cancel-reset" class="ghost-btn" type="button">No, volver</button>
+        <button id="btn-confirm-reset" class="danger-btn" type="button">Sí, reiniciar todo</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
