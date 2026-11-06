@@ -23,9 +23,10 @@ const CHARACTERS = {
   rosi:  { name: "Rosi",  bodyA: "#ffb9cd", bodyB: "#f4739c", line: "rgba(122,47,75,0.35)",  feet: "#d95c85", earStyle: "bear",   earColor: "#f78fae", blush: "rgba(255,77,136,0.40)" },
   lima:  { name: "Lima",  bodyA: "#bde392", bodyB: "#7bc043", line: "rgba(60,100,40,0.35)",  feet: "#5d9a35", earStyle: "cat",    earColor: "#8fc960", blush: "rgba(255,157,92,0.45)" },
   uva:   { name: "Uva",   bodyA: "#cdbaf3", bodyB: "#9a7bd4", line: "rgba(80,50,120,0.35)",  feet: "#7d5fbf", earStyle: "droopy", earColor: "#a98ce0", blush: "rgba(255,95,143,0.40)" },
+  michi: { name: "Michi", bodyA: "#ffe4c8", bodyB: "#fcba78", line: "rgba(122,74,32,0.35)",  feet: "#e08b46", earStyle: "kitty",  earColor: "#f6a35f", blush: "rgba(255,122,92,0.40)" },
 };
 
-const EAR_BASE_ROT = { bunny: 0.45, bear: 0.15, cat: 0.15, droopy: 1.05 };
+const EAR_BASE_ROT = { bunny: 0.45, bear: 0.15, cat: 0.15, droopy: 1.05, kitty: 0.3 };
 
 const BACKGROUNDS = [
   { id: "rosa",      a: "#fff8f0", b: "#ffeef6", c: "#ffe3ef", ring: "#ffd9e8", label: "Rosita" },
@@ -836,6 +837,10 @@ function drawBodyCore(o) {
   const sleeping = o.sleeping;
   const dead = !!o.dead;
   const sad = o.sad;
+  const isKitty = (o.char || settings.character) === "michi";
+
+  // Wavy forked tail, peeking out from the left side of the body
+  if (isKitty) drawKittyTail(o.t, dead, sleeping);
 
   // --- Ears ---
   g.fillStyle = ch.earColor;
@@ -857,6 +862,19 @@ function drawBodyCore(o) {
   g.strokeStyle = ch.line;
   g.lineWidth = 2.5;
   blobBody(g, true);
+
+  // A little ahoge curl on top of her head (doodle homage!)
+  if (isKitty && !dead) {
+    g.strokeStyle = ch.line;
+    g.lineCap = "round";
+    g.lineWidth = 2.6;
+    const sway = sleeping ? 0 : Math.sin(o.t * 2.4) * 2;
+    g.beginPath();
+    g.moveTo(48, 11);
+    g.bezierCurveTo(50 + sway, 3, 42, 0, 45, -6);
+    g.bezierCurveTo(46.5, -9, 49, -8, 48, -5.5);
+    g.stroke();
+  }
 
   // --- Belly patch ---
   g.fillStyle = "rgba(255,255,255,0.55)";
@@ -889,20 +907,70 @@ function drawBodyCore(o) {
     g.beginPath(); g.ellipse(50 - eyeDX - 6, faceY + 10, 5, 3, 0, 0, Math.PI * 2); g.fill();
   }
 
+  // Kitty extras: cheek patches and whiskers, straight from the doodle
+  if (isKitty && !dead) {
+    g.fillStyle = "rgba(255,255,255,0.45)";
+    for (const sx of [-1, 1]) {
+      g.beginPath();
+      g.ellipse(50 + sx * 33, faceY - 14, 6, 4.5, sx * 0.5, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.strokeStyle = "rgba(122,74,32,0.55)";
+    g.lineWidth = 2;
+    g.lineCap = "round";
+    const wig = sleeping ? 0 : Math.sin(o.t * 4) * 0.8;
+    for (const sx of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(50 + sx * 16, faceY + 10);
+      g.lineTo(50 + sx * 31, faceY + 6 + wig);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(50 + sx * 16, faceY + 14);
+      g.lineTo(50 + sx * 31, faceY + 14 + wig);
+      g.stroke();
+    }
+  }
+
   // Mouth
-  if (!dead) drawMouth(o.t, sad, sleeping || isYawning(o.t), o.eating, o.happy);
+  if (!dead) drawMouth(o.t, sad, sleeping || isYawning(o.t), o.eating, o.happy, isKitty);
 
   // --- Feet ---
   g.fillStyle = ch.feet;
   g.beginPath(); g.ellipse(38, 97, 10, 5, 0, 0, Math.PI * 2); g.fill();
   g.beginPath(); g.ellipse(62, 97, 10, 5, 0, 0, Math.PI * 2); g.fill();
+  if (isKitty && !dead) { // tiny toe lines on the little paws
+    g.strokeStyle = ch.line;
+    g.lineWidth = 1.6;
+    g.lineCap = "round";
+    for (const fx of [38, 62]) {
+      g.beginPath();
+      g.moveTo(fx - 2.5, 93.5);
+      g.lineTo(fx - 2.5, 99);
+      g.moveTo(fx + 1.5, 93.5);
+      g.lineTo(fx + 1.5, 99);
+      g.stroke();
+    }
+  }
 
   // --- Food (eat animation) ---
   if (o.eating != null) drawFood(o.eating);
 }
 
-function drawEar(style) {
+// Michi's tail: one single smooth arc, no fork, no folds — never misread
+function drawKittyTail(t, dead, sleeping) {
+  g.strokeStyle = CHARACTERS.michi.earColor;
+  g.lineWidth = 6;
+  g.lineCap = "round";
+  g.lineJoin = "round";
+  const sway = dead ? 0 : Math.sin(t * (sleeping ? 0.8 : 2.2)) * 3;
+
   g.beginPath();
+  g.moveTo(20, 74);
+  g.bezierCurveTo(4 + sway, 80, -8, 72, -13 + sway, 54);
+  g.stroke();
+}
+
+function drawEar(style) {  g.beginPath();
   if (style === "bear") {
     g.arc(0, -9, 11, 0, Math.PI * 2);
   } else if (style === "cat") {
@@ -915,6 +983,12 @@ function drawEar(style) {
     g.quadraticCurveTo(-16, -18, -8, -34);
     g.quadraticCurveTo(2, -26, 6, 2);
     g.closePath();
+  } else if (style === "kitty") {
+    // Big pointy triangles, just like the original doodle
+    g.moveTo(-8, 2);
+    g.quadraticCurveTo(-12, -22, 0, -32);
+    g.quadraticCurveTo(14, -20, 8, 2);
+    g.closePath();
   } else { // bunny
     g.moveTo(-4, 0);
     g.quadraticCurveTo(-10, -26, 2, -34);
@@ -922,6 +996,15 @@ function drawEar(style) {
     g.closePath();
   }
   g.fill();
+  if (style === "kitty") { // soft pink inner ear
+    g.fillStyle = "#ff9db9";
+    g.beginPath();
+    g.moveTo(-3, 0);
+    g.quadraticCurveTo(-4.5, -17, 0, -24);
+    g.quadraticCurveTo(6.5, -14, 4, 0);
+    g.closePath();
+    g.fill();
+  }
 }
 
 // Mix a color 45% toward a soft slate gray (sleeping tint)
@@ -1125,11 +1208,21 @@ function drawVaccine(e, s, c) {
   g.restore();
 }
 
-function drawMouth(t, sad, sleeping, eating, happy) {
+function drawMouth(t, sad, sleeping, eating, happy, kitty) {
   const mouthY = 72;
   g.strokeStyle = "#2d2d3d";
   g.lineWidth = 2.4;
   g.lineCap = "round";
+
+  if (kitty) { // the signature cat nose above the mouth
+    g.fillStyle = "#e2808b";
+    g.beginPath();
+    g.moveTo(50, 63);
+    g.quadraticCurveTo(53.6, 64.8, 50, 67);
+    g.quadraticCurveTo(46.4, 64.8, 50, 63);
+    g.fill();
+  }
+
   if (sleeping) {
     // little open mouth "o" breathing with snore rhythm
     const r = 3 + Math.sin(t * 2.4) * 1.2;
@@ -1141,6 +1234,13 @@ function drawMouth(t, sad, sleeping, eating, happy) {
     g.beginPath();
     g.ellipse(50, mouthY, 7, 2 + chew * 5, 0, 0, Math.PI * 2);
     g.stroke();
+    return;
+  }
+  if (kitty && !sad) { // classic "omega" cat smile
+    g.lineWidth = 2.2;
+    g.beginPath(); g.moveTo(50, 67); g.lineTo(50, 69.4); g.stroke();
+    g.beginPath(); g.arc(47.4, 69.4, 2.6, 0, Math.PI); g.stroke();
+    g.beginPath(); g.arc(52.6, 69.4, 2.6, 0, Math.PI); g.stroke();
     return;
   }
   if (sad) {
