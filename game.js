@@ -114,7 +114,7 @@ const PHRASES = {
 // =============================
 // Anim durations (seconds)
 // =============================
-const ANIM_DUR = { eat: 1.6, clean: 2.6, game: 4, vaccine: 2.6 };
+const ANIM_DUR = { eat: 1.6, clean: 2.6, game: 4, vaccine: 2.6, dance: 3.4 };
 
 // =============================
 // Helpers
@@ -229,6 +229,7 @@ const buttons = {
   play: document.getElementById("btn-play"),
   clean: document.getElementById("btn-clean"),
   sleep: document.getElementById("btn-sleep"),
+  minigames: document.getElementById("btn-minigames"),
 };
 
 function busy() {
@@ -508,6 +509,273 @@ function renderGameIcon(canvasEl, game) {
   }
 }
 
+// =============================
+// Minigames: the 5th button. Tic Tac Toe vs [pet], best of 3.
+// The pet hides while you play; the match always ends in a love dance.
+// =============================
+const MINIGAME_LINES = [
+  [0, 1, 2], [3, 4, 5], [6, 7, 8],   // rows
+  [0, 3, 6], [1, 4, 7], [2, 5, 8],   // columns
+  [0, 4, 8], [2, 4, 6],              // diagonals
+];
+
+const mgEl = document.getElementById("minigame");
+const mgCells = Array.from(document.querySelectorAll("#mg-board .mg-cell"));
+const mgBoardEl = document.getElementById("mg-board");
+const mgStatusEl = document.getElementById("mg-status");
+const mgScoreYouEl = document.getElementById("mg-score-you");
+const mgScorePetEl = document.getElementById("mg-score-pet");
+const mgScoreNameEl = document.getElementById("mg-score-name");
+const mgLineEl = document.getElementById("mg-line");
+const mgRestartBtn = document.getElementById("mg-restart");
+
+const mgState = {
+  open: false,
+  board: Array(9).fill(""),
+  turn: "you",
+  you: 0,
+  pet: 0,
+  round: 1,
+  over: false,
+  timers: [],
+};
+
+function mgTimer(fn, ms) {
+  mgState.timers.push(setTimeout(() => { if (mgState.open) fn(); }, ms));
+}
+
+function mgClearTimers() {
+  for (const t of mgState.timers) clearTimeout(t);
+  mgState.timers.length = 0;
+}
+
+function allStatsAtLeast(n) {
+  return STATS.hunger >= n && STATS.happiness >= n && STATS.energy >= n && STATS.hygiene >= n;
+}
+
+function openMinigames() {
+  if (busy() || pet.dead || pet.sleeping || evol.stage === "egg" || !allStatsAtLeast(90)) return;
+  hideFoodMenu();
+  hideGameMenu();
+  mgState.open = true;
+  mgState.you = 0;
+  mgState.pet = 0;
+  mgState.round = 1;
+  mgScoreNameEl.textContent = settings.name;
+  renderScore();
+  mgRestartBtn.hidden = true;
+  mgEl.hidden = false;
+  playSfx("click");
+  startRound();
+}
+
+function closeMinigames() {
+  mgEl.hidden = true;
+  mgState.open = false;
+  mgClearTimers();
+}
+
+function startRound() {
+  mgClearTimers();
+  mgState.board = Array(9).fill("");
+  mgState.over = false;
+  for (const c of mgCells) {
+    c.className = "mg-cell";
+    c.innerHTML = "";
+    c.disabled = false;
+  }
+  mgBoardEl.classList.remove("mg-shake", "mg-tada");
+  mgLineEl.classList.remove("mg-line-on");
+  mgLineEl.hidden = true;
+  mgRestartBtn.hidden = true;
+  // Alternating start: you open the odd rounds, [pet] the even ones
+  mgState.turn = mgState.round % 2 ? "you" : "pet";
+  if (mgState.turn === "you") {
+    mgStatusEl.textContent = "¡Tú empiezas! Toca una casilla";
+  } else {
+    mgStatusEl.textContent = settings.name + " empieza esta ronda...";
+    mgTimer(petMove, 750);
+  }
+}
+
+function youMove(i) {
+  if (!mgState.open || mgState.over || mgState.turn !== "you" || mgState.board[i]) return;
+  place(i, "you");
+}
+
+function petMove() {
+  if (!mgState.open || mgState.over || mgState.turn !== "pet") return;
+  // Medium level: usually sharp (wins, blocks, takes the center), sometimes dozes off
+  const i = Math.random() < 0.35 ? randomEmpty() : smartPetMove();
+  place(i, "pet");
+}
+
+function randomEmpty() {
+  const empty = mgState.board.map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
+  return empty[Math.floor(Math.random() * empty.length)];
+}
+
+function findWinsInOne(who) {
+  for (const line of MINIGAME_LINES) {
+    const vals = line.map((i) => mgState.board[i]);
+    if (vals.filter((v) => v === who).length === 2 && vals.includes("")) {
+      return line[vals.indexOf("")];
+    }
+  }
+  return -1;
+}
+
+function smartPetMove() {
+  const win = findWinsInOne("pet");
+  if (win >= 0) return win;
+  const block = findWinsInOne("you");
+  if (block >= 0) return block;
+  if (!mgState.board[4]) return 4; // the center is usually the best start
+  const corners = [0, 2, 6, 8].filter((i) => !mgState.board[i]);
+  if (corners.length) return corners[Math.floor(Math.random() * corners.length)];
+  return randomEmpty();
+}
+
+function place(i, who) {
+  mgState.board[i] = who;
+  const cell = mgCells[i];
+  cell.disabled = true;
+  const mark = document.createElement("span");
+  mark.className = "mg-mark " + (who === "you" ? "mark-x" : "mark-o");
+  cell.appendChild(mark);
+  playSfx("click");
+  const line = winnerLine(who);
+  if (line) { endRound(who, line); return; }
+  if (!mgState.board.includes("")) { endRound(null); return; }
+  mgState.turn = who === "you" ? "pet" : "you";
+  mgStatusEl.textContent = mgState.turn === "you"
+    ? "¡Tu turno! ✕"
+    : settings.name + " está pensando... ○";
+  if (mgState.turn === "pet") mgTimer(petMove, 480 + Math.random() * 420);
+}
+
+function winnerLine(who) {
+  for (const line of MINIGAME_LINES) {
+    if (line.every((i) => mgState.board[i] === who)) return line;
+  }
+  return null;
+}
+
+function endRound(winner, line) {
+  mgState.over = true;
+  for (const c of mgCells) c.disabled = true;
+  if (line) {
+    drawStrike(line);
+    for (const i of line) mgCells[i].classList.add("mg-win");
+    mgBoardEl.classList.remove("mg-shake", "mg-tada");
+    void mgBoardEl.offsetWidth;
+    mgBoardEl.classList.add(winner === "you" ? "mg-tada" : "mg-shake");
+  }
+  if (winner === "you") {
+    mgState.you++;
+    playSfx("play", 1.6);
+    mgStatusEl.textContent = "¡Ganaste la ronda! 💖";
+  } else if (winner === "pet") {
+    mgState.pet++;
+    mgStatusEl.textContent = settings.name + " se lleva la ronda 🐾";
+  } else {
+    mgStatusEl.textContent = "¡Empate! Nadie puntúa esta.";
+  }
+  renderScore(winner);
+  mgTimer(() => {
+    if (mgState.you >= 2 || mgState.pet >= 2) finishMatch();
+    else { mgState.round++; startRound(); }
+  }, 1600);
+}
+
+// Draws the animated strike line across the winning trio
+function drawStrike(line) {
+  const boardRect = mgBoardEl.getBoundingClientRect();
+  const a = mgCells[line[0]].getBoundingClientRect();
+  const b = mgCells[line[2]].getBoundingClientRect();
+  const x1 = a.left + a.width / 2 - boardRect.left;
+  const y1 = a.top + a.height / 2 - boardRect.top;
+  const x2 = b.left + b.width / 2 - boardRect.left;
+  const y2 = b.top + b.height / 2 - boardRect.top;
+  const len = Math.hypot(x2 - x1, y2 - y1) * 1.04;
+  const ang = Math.atan2(y2 - y1, x2 - x1);
+  mgLineEl.hidden = false;
+  mgLineEl.style.width = len + "px";
+  mgLineEl.style.left = (x1 + x2) / 2 - len / 2 + "px";
+  mgLineEl.style.top = (y1 + y2) / 2 - 3.5 + "px";
+  mgLineEl.style.transform = "rotate(" + ang + "rad) scale(0)";
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    mgLineEl.classList.add("mg-line-on");
+  }));
+}
+
+function renderScore(winner) {
+  mgScoreYouEl.textContent = mgState.you;
+  mgScorePetEl.textContent = mgState.pet;
+  const target = winner === "you" ? mgScoreYouEl : winner === "pet" ? mgScorePetEl : null;
+  if (target) {
+    target.classList.remove("mg-pop");
+    void target.offsetWidth;
+    target.classList.add("mg-pop");
+  }
+}
+
+function finishMatch() {
+  mgState.over = true;
+  const youWon = mgState.you >= 2;
+  mgStatusEl.textContent = youWon
+    ? "🎉 ¡Ganaste el duelo 2 de 3!"
+    : settings.name + " gana el duelo 🐾 ¡será la próxima!";
+  mgRestartBtn.hidden = false;
+  mgTimer(() => finishMatchAfter(youWon), 1900);
+}
+
+// The match closes and the pet celebrates with its special love dance
+function finishMatchAfter(youWon) {
+  closeMinigames();
+  pet.anim = { type: "dance", start: nowSec };
+  if (youWon) {
+    STATS.happiness = clamp(STATS.happiness + 10, 0, 100);
+    addXp(3);
+  } else {
+    STATS.happiness = clamp(STATS.happiness + 4, 0, 100);
+    addXp(1);
+  }
+  playSfx("play", 2.6);
+  spawnBurst("heart", 10);
+  say(youWon
+    ? pick(["¡Bailoteo de la victoria! 💃💖", "¡Sí, sí, sí! *gira y gira* 💖"])
+    : pick(["¡Buen juego! ¿Revancha? 💖", "*baila igualito* ¡se siente rico! 💖"]), 3.2);
+  updateBars();
+  updateButtonsState();
+  disableButtons(ANIM_DUR.dance);
+  saveGame();
+}
+
+// The little love dance: side-to-side groove with a hop and a spin-tilt
+function danceMotion(e) {
+  const hop = Math.abs(Math.sin(e * 6.4));
+  return {
+    dx: Math.sin(e * 3.2) * 9,
+    dy: -hop * 8,
+    rot: Math.sin(e * 6.4) * 0.13,
+  };
+}
+
+mgCells.forEach((cell, i) => cell.addEventListener("click", () => youMove(i)));
+
+buttons.minigames.addEventListener("click", openMinigames);
+mgRestartBtn.addEventListener("click", () => {
+  playSfx("click");
+  mgState.you = 0;
+  mgState.pet = 0;
+  mgState.round = 1;
+  renderScore();
+  startRound();
+});
+document.getElementById("mg-exit").addEventListener("click", () => { playSfx("click"); closeMinigames(); });
+document.getElementById("mg-exit-x").addEventListener("click", closeMinigames);
+
 function clean() {
   if (busy() || pet.dead || pet.sleeping || evol.stage === "egg" || STATS.hygiene >= 99) return;
   pet.anim = { type: "clean", start: nowSec };
@@ -543,10 +811,13 @@ function updateButtonsState() {
   const egg = evol.stage === "egg";
   const sleeping = pet.sleeping;
   const dead = pet.dead;
+  // The 5th button only lights up with every bar at 90% or more
+  const all90 = allStatsAtLeast(90);
   buttons.feed.disabled = egg || dead || sleeping || busy();
   buttons.play.disabled = egg || dead || sleeping || busy() || STATS.energy < 12;
   buttons.clean.disabled = egg || dead || sleeping || busy();
   buttons.sleep.disabled = egg || dead || busy();
+  buttons.minigames.disabled = egg || dead || sleeping || busy() || !all90;
 }
 
 // =============================
@@ -693,6 +964,7 @@ function drawShadow(x, y, jumpY, s = petScale()) {
 }
 
 function drawPet(t) {
+  if (mgState.open) return; // while the player is inside a minigame, the pet waits off-screen
   const stageScale = evol.stage === "bebe" ? 0.72 : evol.stage === "adulto" ? 1.06 : 1;
   const s = petScale() * stageScale;
   const c = { x: pet.x, y: groundY() };
@@ -703,12 +975,14 @@ function drawPet(t) {
     ? clamp((t - pet.anim.start) / ANIM_DUR.eat, 0, 1)
     : null;
   const playing = pet.anim?.type === "game";
+  const dancing = pet.anim?.type === "dance";
+  const dancingMo = dancing ? danceMotion(t - pet.anim.start) : null;
   const mo = playing
     ? gameMotion(pet.anim.game, t - pet.anim.start, s, c)
-    : null;
+    : dancingMo;
   const liftY = pet.jump.y + (mo ? mo.dy : 0);
-  // while playing, the pet always smiles, even if it is hungry or dirty
-  const faceSad = playing ? false : sad;
+  // while playing or dancing, the pet always smiles, even if it is hungry or dirty
+  const faceSad = playing || dancing ? false : sad;
 
   drawShadow(c.x, c.y, liftY, s);
 
@@ -736,7 +1010,7 @@ function drawPet(t) {
   if (mo && mo.rot) g.rotate(mo.rot);
   g.scale(sx * s * pet.facing, sy * s);
   g.translate(-50, -100); // body coordinate space: 100w x 100h baseline at feet
-  drawBodyCore({ t, sleeping: pet.sleeping, eyeOpen, sad: faceSad, eating, happy: mood === "happy" || playing });
+  drawBodyCore({ t, sleeping: pet.sleeping, eyeOpen, sad: faceSad, eating, happy: mood === "happy" || playing || dancing });
   g.restore();
 
   // The cartoon food being eaten hovers by the mouth, wobbling and
@@ -1840,6 +2114,11 @@ function updateBehavior(dt) {
     }
   }
 
+  // Love dance: hearts rain while the pet grooves
+  if (pet.anim?.type === "dance" && Math.random() < dt * 7) {
+    spawnParticle("heart", pet.x + rand(-55, 75), groundY() - rand(40, 140));
+  }
+
   // Egg wobble pulse decays
   eggPulse = Math.max(0, eggPulse - dt * 2.5);
 
@@ -2020,6 +2299,7 @@ document.getElementById("btn-done").addEventListener("click", closeSettings);
 modalEl.addEventListener("click", (e) => { if (e.target === modalEl) closeSettings(); });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !modalEl.hidden) closeSettings();
+  else if (e.key === "Escape" && !mgEl.hidden) closeMinigames();
 });
 
 // ---- Reset (destructive, asks for confirmation first) ----
@@ -2272,6 +2552,7 @@ document.addEventListener("keydown", (e) => {
   else if (k === "p") toggleGameMenu();
   else if (k === "c") clean();
   else if (k === "s") toggleSleep();
+  else if (k === "g" && mgEl.hidden) openMinigames();
 });
 
 // =============================

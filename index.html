@@ -67,9 +67,10 @@
       <button id="btn-play" class="action-btn">🎾<span>Jugar</span></button>
       <button id="btn-clean" class="action-btn">🚿<span>Ducha</span></button>
       <button id="btn-sleep" class="action-btn">🌙<span>Dormir</span></button>
+      <button id="btn-minigames" class="action-btn minigame-btn" title="Se desbloquea con todas las barritas al 90%">🎲<span>Juegos</span></button>
     </section>
 
-    <p class="hint">Teclas rápidas: <kbd>F</kbd> <kbd>P</kbd> <kbd>C</kbd> <kbd>S</kbd> — F abre el menú de comida, P los minijuegos y un clic en tu mascota la saluda</p>
+    <p class="hint">Teclas rápidas: <kbd>F</kbd> <kbd>P</kbd> <kbd>C</kbd> <kbd>S</kbd> <kbd>G</kbd> — F abre el menú de comida, P los minijuegos y un clic en tu mascota la saluda</p>
   </main>
 
   <div id="settings" class="modal" hidden>
@@ -96,6 +97,40 @@
 
       <button id="btn-done" class="done-btn" type="button">Listo</button>
       <button id="btn-reset" class="danger-btn secondary" type="button">🗑️ Reiniciar partida</button>
+    </div>
+  </div>
+
+  <div id="minigame" class="modal" hidden>
+    <div class="modal-card mg-card">
+      <div class="modal-head">
+        <h2>🎲 Tic Tac Toe</h2>
+        <button id="mg-exit-x" class="close" type="button" aria-label="Salir">✕</button>
+      </div>
+      <p class="mg-sub">El mejor de 3 — gana quien llegue a 2 rondas</p>
+      <div class="mg-score">
+        <span class="mg-side you">Tú ✕</span>
+        <b id="mg-score-you">0</b>
+        <em>:</em>
+        <b id="mg-score-pet">0</b>
+        <span class="mg-side pet">○ <span id="mg-score-name">Mochi</span></span>
+      </div>
+      <p id="mg-status" class="mg-status"></p>
+      <div id="mg-board" class="mg-board">
+        <div id="mg-line" class="mg-line" hidden></div>
+        <button class="mg-cell" type="button"></button>
+        <button class="mg-cell" type="button"></button>
+        <button class="mg-cell" type="button"></button>
+        <button class="mg-cell" type="button"></button>
+        <button class="mg-cell" type="button"></button>
+        <button class="mg-cell" type="button"></button>
+        <button class="mg-cell" type="button"></button>
+        <button class="mg-cell" type="button"></button>
+        <button class="mg-cell" type="button"></button>
+      </div>
+      <div class="mg-foot">
+        <button id="mg-restart" class="ghost-btn" type="button" hidden>🔄 Otra revancha</button>
+        <button id="mg-exit" class="danger-btn secondary" type="button">Salir</button>
+      </div>
     </div>
   </div>
 

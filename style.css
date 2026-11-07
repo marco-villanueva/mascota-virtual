@@ -326,9 +326,23 @@ body {
 .actions {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
   margin: 4px 0 10px;
+}
+
+/* Kawaii "coming soon" pulse for the locked minigames button */
+.minigame-btn:disabled {
+  position: relative;
+  overflow: hidden;
+}
+.minigame-btn:not([hidden]):disabled::after {
+  content: "🔒";
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  font-size: 0.62rem;
+  filter: none;
 }
 
 /* Games popover floats above the action buttons */
@@ -488,6 +502,180 @@ body {
   color: var(--ink-soft);
   font-size: 0.8rem;
 }
+
+/* ===== Minigames overlay: Tic Tac Toe, best of 3 ===== */
+
+#minigame {
+  backdrop-filter: blur(14px) brightness(0.92); /* the pet stays hidden while playing */
+}
+
+.mg-card { width: min(420px, 100%); }
+
+.mg-sub {
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  margin: -6px 0 10px;
+}
+
+.mg-score {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-weight: 800;
+}
+
+.mg-side { color: var(--ink-soft); font-size: 0.95rem; }
+.mg-side.you { color: #f25d9c; }
+.mg-side.pet { color: #7ba7d9; }
+
+.mg-score b {
+  display: grid;
+  place-items: center;
+  min-width: 2em;
+  height: 2em;
+  border-radius: 12px;
+  background: #fdf4fa;
+  box-shadow: inset 0 0 0 2px #f3e2ef;
+  font-size: 1.2rem;
+  color: var(--ink);
+}
+
+.mg-score b.mg-pop { animation: mg-score-pop 0.45s cubic-bezier(.34,1.56,.64,1); }
+
+@keyframes mg-score-pop {
+  40% { transform: scale(1.35); background: #ffe3f0; }
+}
+
+.mg-status {
+  text-align: center;
+  min-height: 1.5em;
+  margin: 8px 0;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.mg-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: min(76vw, 290px);
+  margin: 0 auto 14px;
+}
+
+.mg-board.mg-shake { animation: mg-shake 0.5s ease; }
+.mg-board.mg-tada { animation: mg-tada 0.55s ease; }
+
+@keyframes mg-shake {
+  25% { transform: translateX(-6px); }
+  50% { transform: translateX(6px); }
+  75% { transform: translateX(-4px); }
+}
+
+@keyframes mg-tada {
+  30% { transform: scale(1.05) rotate(2deg); }
+  60% { transform: scale(1.05) rotate(-2deg); }
+}
+
+.mg-cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: none;
+  border-radius: 16px;
+  background: #fdf4fa;
+  box-shadow: inset 0 0 0 2px #f3e2ef;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, transform 0.12s;
+  overflow: hidden;
+}
+
+.mg-cell:hover:not(:disabled) { background: #fce9f5; }
+.mg-cell:disabled { cursor: default; }
+
+/* ghost mark preview while hovering an empty cell */
+.mg-cell:not(:disabled)::after {
+  content: "✕";
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: rgba(242, 93, 156, 0.28);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.mg-cell:not(:disabled):hover::after { opacity: 1; }
+
+/* the marks — X = you, O = your pet */
+.mg-mark {
+  position: absolute;
+  pointer-events: none;
+}
+
+.mark-x {
+  width: 46%;
+  height: 46%;
+  transform: rotate(45deg);
+  animation: mark-pop 0.42s cubic-bezier(.34,1.56,.64,1);
+}
+.mark-x::before,
+.mark-x::after {
+  content: "";
+  position: absolute;
+  background: #f25d9c;
+  border-radius: 99px;
+}
+.mark-x::before { top: 41%; bottom: 41%; left: 0; right: 0; }
+.mark-x::after  { left: 41%; right: 41%; top: 0; bottom: 0; }
+
+.mark-o {
+  width: 52%;
+  height: 52%;
+  border: 5px solid #7ba7d9;
+  border-radius: 50%;
+  animation: mark-pop 0.42s cubic-bezier(.34,1.56,.64,1);
+}
+
+@keyframes mark-pop {
+  from { transform: scale(0) rotate(-40deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+@keyframes mark-pop-o {
+  from { transform: scale(0) rotate(40deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+/* winning cells glow */
+.mg-cell.mg-win { background: #ffe0ef; animation: mg-win-pulse 0.6s ease 2; }
+
+@keyframes mg-win-pulse {
+  50% { transform: scale(0.93); box-shadow: inset 0 0 0 4px #ffb8dc; }
+}
+
+/* the strike-through line of the winning trio */
+.mg-line {
+  position: absolute;
+  height: 7px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #f78fb8, #f25d9c);
+  box-shadow: 0 0 12px rgba(242, 93, 156, 0.55);
+  transform-origin: center;
+  transform: scale(0);
+  transition: transform 0.45s cubic-bezier(.6,1.8,.5,1) 0.15s;
+  z-index: 5;
+  pointer-events: none;
+}
+.mg-line.mg-line-on { transform: scale(1); }
+
+.mg-foot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mg-foot .danger-btn.secondary { grid-column: 2; }
 
 kbd {
   background: #f4edf2;
