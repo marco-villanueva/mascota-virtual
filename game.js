@@ -23,10 +23,24 @@ const CHARACTERS = {
   rosi:  { name: "Rosi",  bodyA: "#ffb9cd", bodyB: "#f4739c", line: "rgba(122,47,75,0.35)",  feet: "#d95c85", earStyle: "bear",   earColor: "#f78fae", blush: "rgba(255,77,136,0.40)" },
   lima:  { name: "Lima",  bodyA: "#bde392", bodyB: "#7bc043", line: "rgba(60,100,40,0.35)",  feet: "#5d9a35", earStyle: "cat",    earColor: "#8fc960", blush: "rgba(255,157,92,0.45)" },
   uva:   { name: "Uva",   bodyA: "#cdbaf3", bodyB: "#9a7bd4", line: "rgba(80,50,120,0.35)",  feet: "#7d5fbf", earStyle: "droopy", earColor: "#a98ce0", blush: "rgba(255,95,143,0.40)" },
-  michi: { name: "Michi", bodyA: "#ffe4c8", bodyB: "#fcba78", line: "rgba(122,74,32,0.35)",  feet: "#e08b46", earStyle: "kitty",  earColor: "#f6a35f", blush: "rgba(255,122,92,0.40)" },
+  michi: { name: "Michi", bodyA: "#ffe4c8", bodyB: "#fcba78", line: "rgba(122,74,32,0.35)",  feet: "#e08b46", earStyle: "kitty",  earColor: "#f6a35f", blush: "rgba(255,122,92,0.40)", toes: true },
+  axo:   { name: "Axo",   bodyA: "#ffa4c1", bodyB: "#ff6f9e", line: "rgba(130,38,80,0.35)",  feet: "#ff8fb3", earStyle: "gills",   earColor: "#f9448f", blush: "rgba(255,77,136,0.45)", toes: true, tail: "#ff7fa8" },
+  nube:  { name: "Nube",  bodyA: "#fdf9fb", bodyB: "#ece2ec", line: "rgba(105,88,120,0.35)", feet: "#e9e0ea", earStyle: "highbunny", earColor: "#faf4fa", earIn: "#ff77b2", blushStyle: "dashes", toes: true },
+  rex:   { name: "Rex",   bodyA: "#b6dc72", bodyB: "#7fbe45", line: "rgba(45,88,32,0.35)",   feet: "#5d9a35", earStyle: "none",    earColor: "#f2c74a", blush: "rgba(255,157,92,0.42)", toes: true, tail: "#8cc84c" },
+  vicky: { name: "Vicky", bodyA: "#f8d94e", bodyB: "#e0ad2c", line: "rgba(120,70,15,0.35)",  feet: "#ecc83d", earStyle: "cocker",  earColor: "#f2b13c", blush: "rgba(255,120,70,0.42)", toes: true },
+  perez: { name: "Pérez", bodyA: "#e3dedf", bodyB: "#c2bac4", line: "rgba(85,72,90,0.35)",   feet: "#cbc3cb", earStyle: "round",   earColor: "#cfc9d0", earIn: "#ff6fa5", blush: "rgba(255,130,170,0.5)", toes: true },
 };
 
-const EAR_BASE_ROT = { bunny: 0.45, bear: 0.15, cat: 0.15, droopy: 1.05, kitty: 0.3 };
+const EAR_BASE_ROT = { bunny: 0.45, bear: 0.15, cat: 0.15, droopy: 1.05, kitty: 0.3, gills: 0.55, highbunny: 0.32, none: 0, cocker: 0.06, round: 0.12 };
+
+// Inner-ear / detail colors used by drawEar, including the doodle scribbles
+const EAR_IN = { kitty: "#ff9db9", highbunny: "#ff77b2", round: "#ff6fa5", gills: "rgba(150,25,90,0.4)" };
+
+// Mouth style per character: nose + smile shape drawn by drawMouth
+const MOUTH_STYLE = { michi: "kitty", axo: "axo", nube: "bunny", perez: "mouse", vicky: "dog" };
+
+// Characters whose eyes carry an extra little shine dot, like the doodles
+const SPARKLE_EYES = { michi: true, axo: true, nube: true, rex: true, vicky: true, perez: true };
 
 const BACKGROUNDS = [
   { id: "rosa",      a: "#fff8f0", b: "#ffeef6", c: "#ffe3ef", ring: "#ffd9e8", label: "Rosita" },
@@ -833,24 +847,33 @@ function drawShower(e, s, c) {
 // Core drawing in body space (100w x 100h, feet at y=100). Shared by the stage
 // and the settings-panel previews. `o`: { t, sleeping, eyeOpen, sad, eating, happy, char? }
 function drawBodyCore(o) {
-  const ch = CHARACTERS[o.char || settings.character];
+  const chId = o.char || settings.character;
+  const ch = CHARACTERS[chId];
   const sleeping = o.sleeping;
   const dead = !!o.dead;
   const sad = o.sad;
-  const isKitty = (o.char || settings.character) === "michi";
+  const isKitty = chId === "michi";
 
-  // Wavy forked tail, peeking out from the left side of the body
+  // Behind-the-body extras: tails and crests, straight from each doodle
   if (isKitty) drawKittyTail(o.t, dead, sleeping);
+  if (chId === "rex") drawSpikeCrest(o, ch);
+  if (chId === "perez" && !dead) drawMouseTail(o.t);
+  if (chId === "axo" || chId === "rex") drawDinoTail(o.t, ch, dead, sleeping);
+  if (chId === "vicky" && !dead) drawCockerTail(o.t, ch);
+  if (chId === "nube" && !dead) drawFluffTail(ch);
 
   // --- Ears ---
-  g.fillStyle = ch.earColor;
-  const wig = dead ? 0 : sleeping ? 0.15 : Math.sin(o.t * 3) * 0.06;
-  for (const dir of [-1, 1]) {
-    g.save();
-    g.translate(50 + dir * 30, 26);
-    g.rotate(dir * (EAR_BASE_ROT[ch.earStyle] + wig));
-    drawEar(ch.earStyle);
-    g.restore();
+  // Cocker ears are drawn over the body later, so Vicky gets real ear-flaps
+  if (ch.earStyle !== "cocker") {
+    g.fillStyle = ch.earColor;
+    const wig = dead ? 0 : sleeping ? 0.15 : Math.sin(o.t * 3) * 0.06;
+    for (const dir of [-1, 1]) {
+      g.save();
+      g.translate(50 + dir * 30, 26);
+      g.rotate(dir * (EAR_BASE_ROT[ch.earStyle] + wig));
+      drawEar(ch.earStyle, dir, outlineOf(ch));
+      g.restore();
+    }
   }
 
   // --- Body ---
@@ -897,50 +920,91 @@ function drawBodyCore(o) {
     g.quadraticCurveTo(50, 69, 55, 72);
     g.stroke();
   } else if (sleeping) { drawClosedEyes(50 + eyeDX, faceY, 50 - eyeDX, faceY); }
-  else if (o.eyeOpen > 0.15) { drawOpenEyes(50 + eyeDX, faceY + eyeDY, 50 - eyeDX, faceY + eyeDY, o.eyeOpen, sad); }
+  else if (o.eyeOpen > 0.15) {
+    drawOpenEyes(50 + eyeDX, faceY + eyeDY, 50 - eyeDX, faceY + eyeDY, o.eyeOpen, sad);
+    // the doodles' shiny two-dot eye sparkle
+    if (SPARKLE_EYES[chId]) drawEyeSparkles(50 + eyeDX, faceY + eyeDY, 50 - eyeDX, faceY + eyeDY);
+  }
   else { drawClosedEyes(50 + eyeDX, faceY, 50 - eyeDX, faceY); }
 
-  // Blush
+  // Blush — soft ovals, or Nube's three little dash marks like the doodle
   if (!dead) {
-    g.fillStyle = ch.blush;
-    g.beginPath(); g.ellipse(50 + eyeDX + 6, faceY + 10, 5, 3, 0, 0, Math.PI * 2); g.fill();
-    g.beginPath(); g.ellipse(50 - eyeDX - 6, faceY + 10, 5, 3, 0, 0, Math.PI * 2); g.fill();
+    if (ch.blushStyle === "dashes") {
+      g.strokeStyle = "rgba(255,79,150,0.55)";
+      g.lineWidth = 2.2;
+      g.lineCap = "round";
+      for (const sx of [-1, 1]) {
+        for (let i = 0; i < 3; i++) {
+          const bx = 50 + sx * (eyeDX + 3 + i * 5);
+          g.beginPath();
+          g.moveTo(bx, faceY + 7);
+          g.lineTo(bx + sx * 2.2, faceY + 12);
+          g.stroke();
+        }
+      }
+    } else {
+      g.fillStyle = ch.blush;
+      g.beginPath(); g.ellipse(50 + eyeDX + 6, faceY + 10, 5, 3, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(50 - eyeDX - 6, faceY + 10, 5, 3, 0, 0, Math.PI * 2); g.fill();
+    }
   }
 
-  // Kitty extras: cheek patches and whiskers, straight from the doodle
-  if (isKitty && !dead) {
-    g.fillStyle = "rgba(255,255,255,0.45)";
-    for (const sx of [-1, 1]) {
-      g.beginPath();
-      g.ellipse(50 + sx * 33, faceY - 14, 6, 4.5, sx * 0.5, 0, Math.PI * 2);
-      g.fill();
-    }
-    g.strokeStyle = "rgba(122,74,32,0.55)";
-    g.lineWidth = 2;
-    g.lineCap = "round";
-    const wig = sleeping ? 0 : Math.sin(o.t * 4) * 0.8;
-    for (const sx of [-1, 1]) {
-      g.beginPath();
-      g.moveTo(50 + sx * 16, faceY + 10);
-      g.lineTo(50 + sx * 31, faceY + 6 + wig);
-      g.stroke();
-      g.beginPath();
-      g.moveTo(50 + sx * 16, faceY + 14);
-      g.lineTo(50 + sx * 31, faceY + 14 + wig);
-      g.stroke();
+  // Whiskers: Michi's cheeky two, Pérez's long elegant three per side
+  if (!dead && (isKitty || chId === "perez")) {
+    if (isKitty) {
+      g.fillStyle = "rgba(255,255,255,0.45)";
+      for (const sx of [-1, 1]) {
+        g.beginPath();
+        g.ellipse(50 + sx * 33, faceY - 14, 6, 4.5, sx * 0.5, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.strokeStyle = "rgba(122,74,32,0.55)";
+      g.lineWidth = 2;
+      g.lineCap = "round";
+      const wig = sleeping ? 0 : Math.sin(o.t * 4) * 0.8;
+      for (const sx of [-1, 1]) {
+        g.beginPath();
+        g.moveTo(50 + sx * 16, faceY + 10);
+        g.lineTo(50 + sx * 31, faceY + 6 + wig);
+        g.stroke();
+        g.beginPath();
+        g.moveTo(50 + sx * 16, faceY + 14);
+        g.lineTo(50 + sx * 31, faceY + 14 + wig);
+        g.stroke();
+      }
+    } else {
+      g.strokeStyle = "rgba(85,72,90,0.6)";
+      g.lineWidth = 1.8;
+      g.lineCap = "round";
+      const wig = sleeping ? 0 : Math.sin(o.t * 3.4) * 1.2;
+      for (const sx of [-1, 1]) {
+        for (let i = 0; i < 3; i++) {
+          g.beginPath();
+          g.moveTo(50 + sx * 15, faceY + 7 + i * 4.5);
+          g.lineTo(50 + sx * 37, faceY + 3 + i * 7.5 + wig);
+          g.stroke();
+        }
+      }
     }
   }
+
+  // Vicky's giant cocker lobes, drawn IN FRONT so they frame the whole face
+  if (ch.earStyle === "cocker") drawCockerEars(o.t, ch, dead, sleeping);
 
   // Mouth
-  if (!dead) drawMouth(o.t, sad, sleeping || isYawning(o.t), o.eating, o.happy, isKitty);
+  if (!dead) drawMouth(o.t, sad, sleeping || isYawning(o.t), o.eating, o.happy, MOUTH_STYLE[chId]);
 
   // --- Feet ---
-  g.fillStyle = ch.feet;
-  g.beginPath(); g.ellipse(38, 97, 10, 5, 0, 0, Math.PI * 2); g.fill();
-  g.beginPath(); g.ellipse(62, 97, 10, 5, 0, 0, Math.PI * 2); g.fill();
-  if (isKitty && !dead) { // tiny toe lines on the little paws
-    g.strokeStyle = ch.line;
-    g.lineWidth = 1.6;
+  for (const fx of [38, 62]) {
+    g.fillStyle = ch.feet;
+    g.beginPath(); g.ellipse(fx, 97, 10, 5, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = outlineOf(ch); // cartoon outline on the little paws
+    g.lineWidth = 2;
+    g.stroke();
+  }
+  if (ch.toes && !dead) { // tiny toe lines on the little paws
+    g.strokeStyle = outlineOf(ch);
+    g.lineWidth = 2;
     g.lineCap = "round";
     for (const fx of [38, 62]) {
       g.beginPath();
@@ -970,41 +1034,237 @@ function drawKittyTail(t, dead, sleeping) {
   g.stroke();
 }
 
-function drawEar(style) {  g.beginPath();
+// Rex's back ridge: little yellow triangles peeking out behind the
+// body's top-left silhouette, straight from the doodle
+function drawSpikeCrest(o, ch) {
+  const fill = o.sleeping || o.dead ? desat("#f2c74a") : "#f2c74a";
+  const pts = [ // [baseX, baseY, tipX, tipY] along the back edge
+    [46, 12, 50, 2], [34, 14, 34, 3], [23, 21, 21, 10], [14, 32, 10, 22],
+    [9, 46, 4, 36], [7, 60, 1, 51], [8, 74, 2, 66], [12, 87, 6, 79],
+  ];
+  for (const [bx, by, tx, ty] of pts) {
+    const dx = tx - bx, dy = ty - by;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = (dy / len) * 4.2, ny = (-dx / len) * 4.2;
+    g.fillStyle = fill;
+    g.beginPath();
+    g.moveTo(bx - nx, by - ny);
+    g.lineTo(tx, ty);
+    g.lineTo(bx + nx, by + ny);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = "rgba(140,105,20,0.4)";
+    g.lineWidth = 1.5;
+    g.stroke();
+  }
+}
+
+// Pérez's long thin pink tail dragging along the ground
+function drawMouseTail(t) {
+  g.strokeStyle = "#ff8fb3";
+  g.lineWidth = 3.5;
+  g.lineCap = "round";
+  const sway = Math.sin(t * 1.6) * 3;
+  g.beginPath();
+  g.moveTo(24, 88);
+  g.bezierCurveTo(2 + sway, 96, -14, 78, -24 + sway * 0.6, 90);
+  g.stroke();
+}
+
+// Chunky dinosaur-style tail tapering to a point — shared by Rex and Axo
+function drawDinoTail(t, ch, dead, sleeping) {
+  const fill = (sleeping || dead) ? desat(ch.tail || ch.earColor) : (ch.tail || ch.earColor);
+  g.fillStyle = fill;
+  g.save();
+  g.translate(24, 80);
+  g.rotate(dead ? 0 : Math.sin(t * (sleeping ? 0.7 : 1.6)) * 0.06);
+  g.beginPath();
+  g.moveTo(0, -9);
+  g.quadraticCurveTo(-16, -10, -30, 10); // upper edge sweeping out to the tip
+  g.quadraticCurveTo(-33, 15, -28, 14);  // sharp little tip
+  g.quadraticCurveTo(-18, 12, -10, 12);
+  g.quadraticCurveTo(-3, 12, 0, 9);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = outlineOf(ch);
+  g.lineWidth = 2;
+  g.lineJoin = "round";
+  g.stroke();
+  g.restore();
+}
+
+// Vicky's cocker tail: a happy wisp with a sharp pointed tip (no cat curl)
+function drawCockerTail(t, ch) {
+  g.fillStyle = ch.feet; // brighter than the body so the wisp reads clearly
+  g.save();
+  g.translate(24, 86);
+  g.rotate(Math.sin(t * 3) * 0.25);
+  g.beginPath();
+  g.moveTo(0, -4);
+  g.quadraticCurveTo(-14, -8, -26, -22); // upper edge to the sharp tip
+  g.quadraticCurveTo(-11, -6, 0, 8);     // lower edge back to the body
+  g.closePath();
+  g.fill();
+  g.strokeStyle = outlineOf(ch);
+  g.lineWidth = 2;
+  g.lineJoin = "round";
+  g.stroke();
+  g.restore();
+}
+
+// Nube's round fluff tail: a solid white little ball with a gray outline
+function drawFluffTail(ch) {
+  g.fillStyle = "#ffffff";
+  g.beginPath();
+  g.arc(12, 92, 7, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = outlineOf(ch);
+  g.lineWidth = 2;
+  g.stroke();
+  // a tiny scribble on the visible puff for that doodle fluff feel
+  g.strokeStyle = ch.line;
+  g.lineWidth = 1.8;
+  g.lineCap = "round";
+  g.beginPath();
+  g.arc(9, 89, 3.5, Math.PI * 0.9, Math.PI * 1.7);
+  g.stroke();
+}
+
+// A second tiny highlight dot below the main one — the doodles' shiny eyes
+function drawEyeSparkles(x1, y1, x2, y2) {
+  g.fillStyle = "#fff";
+  for (const [x, y] of [[x1, y1], [x2, y2]]) {
+    g.beginPath();
+    g.arc(x - 1.2, y + 3.4, 1.1, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+function drawEar(style, dir = 1, line = "rgba(0,0,0,0.25)") {
+  if (style === "none") return; // Rex draws his own crest instead of ears
+
+  g.lineJoin = "round";
+  g.beginPath();
   if (style === "bear") {
     g.arc(0, -9, 11, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = line; g.lineWidth = 2; g.stroke();
   } else if (style === "cat") {
     g.moveTo(-7, 2);
     g.quadraticCurveTo(-4, -24, 3, -28);
     g.quadraticCurveTo(9, -18, 7, 0);
     g.closePath();
+    g.fill();
+    g.strokeStyle = line; g.lineWidth = 2; g.stroke();
   } else if (style === "droopy") {
     g.moveTo(-4, 0);
     g.quadraticCurveTo(-16, -18, -8, -34);
     g.quadraticCurveTo(2, -26, 6, 2);
     g.closePath();
+    g.fill();
+    g.strokeStyle = line; g.lineWidth = 2; g.stroke();
   } else if (style === "kitty") {
     // Big pointy triangles, just like the original doodle
     g.moveTo(-8, 2);
     g.quadraticCurveTo(-12, -22, 0, -32);
     g.quadraticCurveTo(14, -20, 8, 2);
     g.closePath();
-  } else { // bunny
-    g.moveTo(-4, 0);
-    g.quadraticCurveTo(-10, -26, 2, -34);
-    g.quadraticCurveTo(10, -24, 6, 2);
-    g.closePath();
-  }
-  g.fill();
-  if (style === "kitty") { // soft pink inner ear
-    g.fillStyle = "#ff9db9";
+    g.fill();
+    g.strokeStyle = line; g.lineWidth = 2; g.stroke();
+    g.fillStyle = EAR_IN.kitty; // soft pink inner ear
     g.beginPath();
     g.moveTo(-3, 0);
     g.quadraticCurveTo(-4.5, -17, 0, -24);
     g.quadraticCurveTo(6.5, -14, 4, 0);
     g.closePath();
     g.fill();
+  } else if (style === "bunny") {
+    g.moveTo(-4, 0);
+    g.quadraticCurveTo(-10, -26, 2, -34);
+    g.quadraticCurveTo(10, -24, 6, 2);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = line; g.lineWidth = 2; g.stroke();
+  } else if (style === "highbunny") {
+    // Nube's extra-tall ears with the pink inner stripe
+    g.moveTo(-6, 2);
+    g.quadraticCurveTo(-9, -36, 0, -46);
+    g.quadraticCurveTo(10, -34, 7, 2);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = line; g.lineWidth = 2; g.stroke();
+    g.fillStyle = EAR_IN.highbunny;
+    g.beginPath();
+    g.moveTo(-2.5, 0);
+    g.quadraticCurveTo(-4.5, -28, 0, -37);
+    g.quadraticCurveTo(5.5, -26, 3.5, 0);
+    g.closePath();
+    g.fill();
+  } else if (style === "gills") {
+    // Axo: three feathery stalks fanning out from each side of the head
+    for (const a of [-0.42, 0, 0.42]) {
+      g.save();
+      g.rotate(a);
+      g.beginPath();
+      g.moveTo(-2.5, -2);
+      g.quadraticCurveTo(-5.5, -15, 0, -23);
+      g.quadraticCurveTo(6, -14, 3, -2);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = line;
+      g.lineWidth = 1.6;
+      g.stroke();
+      g.restore();
+    }
+  } else if (style === "round") {
+    // Pérez's big round ears with the pink inner cup and a shine dot
+    g.arc(0, -10, 13, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = line; g.lineWidth = 2; g.stroke();
+    g.fillStyle = EAR_IN.round;
+    g.beginPath();
+    g.arc(1, -11, 8.4, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "rgba(255,255,255,0.75)";
+    g.beginPath();
+    g.arc(-2.5, -14.5, 1.9, 0, Math.PI * 2);
+    g.fill();
+  } else if (style === "cocker") {
+    // Vicky's ears draw themselves over the body in drawCockerEars instead
+    return;
   }
+}
+
+// Vicky's giant cocker spaniel lobes: sprouting from the crown corners and
+// flaring outward like the doodle, top tucked toward the center of the head
+function drawCockerEars(t, ch, dead, sleeping) {
+  const sway = dead || sleeping ? 0 : Math.sin(t * 2.6) * 0.03;
+  const tint = (sleeping || dead) ? desat(ch.earColor) : ch.earColor;
+  for (const dir of [-1, 1]) {
+    g.save();
+    g.translate(50 + dir * 24, 28);
+    g.rotate(dir * sway);
+    g.scale(dir, 1); // author the lobe once, mirror it per side
+    g.beginPath();
+    g.moveTo(-7, -14);
+    g.bezierCurveTo(3, -18, 15, -10, 19, 0);   // top tucked in at the crown
+    g.bezierCurveTo(24, 12, 24, 24, 14, 34);   // outer edge flaring outward
+    g.bezierCurveTo(7, 40, -2, 38, -4, 30);    // rounded bottom turned out
+    g.bezierCurveTo(-8, 18, -10, -2, -7, -14); // inner edge back to the crown
+    g.closePath();
+    g.fillStyle = tint;
+    g.fill();
+    g.strokeStyle = outlineOf(ch);
+    g.lineWidth = 2.2;
+    g.lineJoin = "round";
+    g.stroke();
+    g.restore();
+  }
+}
+
+// Cadence-of-cartoons outline: the body's line tone, read slightly stronger
+function outlineOf(ch) {
+  return (ch.line || "rgba(0,0,0,0.3)").replace("0.35)", "0.55)");
 }
 
 // Mix a color 45% toward a soft slate gray (sleeping tint)
@@ -1208,19 +1468,40 @@ function drawVaccine(e, s, c) {
   g.restore();
 }
 
-function drawMouth(t, sad, sleeping, eating, happy, kitty) {
+function drawMouth(t, sad, sleeping, eating, happy, style) {
+  if (style === true) style = "kitty"; // legacy boolean callers
   const mouthY = 72;
   g.strokeStyle = "#2d2d3d";
   g.lineWidth = 2.4;
   g.lineCap = "round";
 
-  if (kitty) { // the signature cat nose above the mouth
+  // Character noses above the mouth (kept visible in every mood)
+  if (style === "kitty") {
     g.fillStyle = "#e2808b";
     g.beginPath();
     g.moveTo(50, 63);
     g.quadraticCurveTo(53.6, 64.8, 50, 67);
     g.quadraticCurveTo(46.4, 64.8, 50, 63);
     g.fill();
+  } else if (style === "bunny") {
+    g.fillStyle = "#ff77b2";
+    g.beginPath();
+    g.moveTo(46.6, 63.4);
+    g.lineTo(53.4, 63.4);
+    g.quadraticCurveTo(53.2, 66.8, 50, 67.4);
+    g.quadraticCurveTo(46.8, 66.8, 46.6, 63.4);
+    g.fill();
+    g.fillStyle = "rgba(255,255,255,0.85)";
+    g.beginPath(); g.arc(48.6, 64.5, 0.8, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(51.4, 64.3, 0.6, 0, Math.PI * 2); g.fill();
+  } else if (style === "mouse") {
+    g.fillStyle = "#ff5f9e";
+    g.beginPath(); g.ellipse(50, 64.6, 3.6, 2.7, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "rgba(255,255,255,0.85)";
+    g.beginPath(); g.arc(48.9, 63.6, 0.9, 0, Math.PI * 2); g.fill();
+  } else if (style === "dog") {
+    g.fillStyle = "#2d2d3d";
+    g.beginPath(); g.ellipse(50, 64.4, 3.9, 2.5, 0, 0, Math.PI * 2); g.fill();
   }
 
   if (sleeping) {
@@ -1236,11 +1517,44 @@ function drawMouth(t, sad, sleeping, eating, happy, kitty) {
     g.stroke();
     return;
   }
-  if (kitty && !sad) { // classic "omega" cat smile
+  if (style === "dog" && !sad) {
+    // Sol's open puppy smile with a bit of tongue peeking out
+    g.lineWidth = 2.2;
+    g.beginPath();
+    g.moveTo(43.4, 68.5);
+    g.quadraticCurveTo(50, 77.5, 56.6, 68.5);
+    g.quadraticCurveTo(50, 71.2, 43.4, 68.5);
+    g.closePath();
+    g.fillStyle = "#f281a8";
+    g.fill();
+    g.stroke();
+    g.fillStyle = "#e24444";
+    g.beginPath(); g.ellipse(50, 74.2, 3, 2.4, 0, 0, Math.PI * 2); g.fill();
+    return;
+  }
+  if (style && style !== "dog" && !sad) {
+    // the omega family: line down from the nose and two little bumps
     g.lineWidth = 2.2;
     g.beginPath(); g.moveTo(50, 67); g.lineTo(50, 69.4); g.stroke();
-    g.beginPath(); g.arc(47.4, 69.4, 2.6, 0, Math.PI); g.stroke();
-    g.beginPath(); g.arc(52.6, 69.4, 2.6, 0, Math.PI); g.stroke();
+    const br = style === "mouse" ? 2.3 : 2.6;
+    g.beginPath(); g.arc(50 - br, 69.4, br, 0, Math.PI); g.stroke();
+    g.beginPath(); g.arc(50 + br, 69.4, br, 0, Math.PI); g.stroke();
+    if (style === "mouse") { // Pérez's two little buck teeth
+      g.fillStyle = "#fff";
+      g.strokeStyle = "rgba(85,72,90,0.5)";
+      g.lineWidth = 1.1;
+      g.lineJoin = "round";
+      for (const tx of [47.9, 50.5]) {
+        g.beginPath();
+        g.moveTo(tx, 71);
+        g.lineTo(tx + 1.6, 71);
+        g.lineTo(tx + 1.6, 73.6);
+        g.quadraticCurveTo(tx + 0.8, 74.9, tx, 73.6);
+        g.closePath();
+        g.fill();
+        g.stroke();
+      }
+    }
     return;
   }
   if (sad) {
@@ -1875,6 +2189,7 @@ function loadGame() {
     if (!raw) return;
     const data = JSON.parse(raw);
     if (data.settings) Object.assign(settings, data.settings);
+    if (settings.character === "sol") settings.character = "vicky"; // rename migration
     if (data.evol && EVOL_STAGES.includes(data.evol.stage)) Object.assign(evol, data.evol);
     else if (data.stats) evol.stage = "bebe"; // legacy save: pet already hatched
     if (!data.stats) return;

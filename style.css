@@ -545,10 +545,14 @@ kbd {
   padding: 20px 22px;
   width: min(400px, 100%);
   max-height: 90vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   text-align: left;
   animation: modal-pop 0.22s ease-out;
 }
+
+/* Fixed-height modal: only the characters grid scrolls inside */
+.modal-card > * { flex-shrink: 0; }
 
 @keyframes modal-pop {
   from { transform: scale(0.92) translateY(10px); opacity: 0; }
@@ -631,11 +635,32 @@ kbd {
   transform: scale(1.12);
 }
 
+.char-field {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-left: -6px;
+  margin-right: -6px;
+  padding-left: 6px;
+  padding-right: 6px; /* room so the scrollbar doesn't cover the cards */
+}
+
 .chars {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+  align-content: start;
+  scrollbar-width: thin;
+  scrollbar-color: #e3cfe4 transparent;
 }
+
+.chars::-webkit-scrollbar { width: 6px; }
+.chars::-webkit-scrollbar-thumb { background: #e3cfe4; border-radius: 999px; }
+.chars::-webkit-scrollbar-track { background: transparent; }
 
 .char-card {
   border: 3px solid transparent;
