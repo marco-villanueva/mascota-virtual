@@ -121,6 +121,11 @@
             <b>Simón Dice</b>
             <span class="mg-menu-desc">Repite la secuencia de <span class="mg-menu-name">Mochi</span></span>
           </button>
+          <button class="mg-menu-item" id="mg-menu-hide" type="button">
+            <span class="mg-menu-emoji" aria-hidden="true">📦</span>
+            <b>¿Dónde está Mochi?</b>
+            <span class="mg-menu-desc">Sigue las cajas y encuentra a <span class="mg-menu-name">Mochi</span></span>
+          </button>
         </div>
         <div class="mg-foot">
           <button class="mg-exit danger-btn secondary" type="button">Salir</button>
@@ -170,6 +175,27 @@
           <button class="mg-pad" data-pad="1" type="button" aria-label="Pad rosa"></button>
           <button class="mg-pad" data-pad="2" type="button" aria-label="Pad azul"></button>
           <button class="mg-pad" data-pad="3" type="button" aria-label="Pad dorado"></button>
+        </div>
+        <div class="mg-foot">
+          <button class="mg-back ghost-btn" type="button">‹ Menú</button>
+          <button class="mg-exit danger-btn secondary" type="button">Salir</button>
+        </div>
+      </div>
+      <!-- Game: find the pet under the boxes -->
+      <div id="mg-find-view" hidden>
+        <p class="mg-sub">Sigue a tu mascota entre las cajas</p>
+        <div class="mg-score">
+          <span class="mg-side you">Tú</span>
+          <b id="mg-find-you">0</b>
+          <em>:</em>
+          <b id="mg-find-pet">0</b>
+          <span class="mg-side pet"><span id="mg-find-name">Mochi</span> 🐾</span>
+        </div>
+        <p id="mg-find-status" class="mg-status"></p>
+        <div id="mg-find-board" class="mg-find-board">
+          <div class="mg-cup" data-cup="0"><canvas class="mg-find-pet-canvas"></canvas><div class="mg-cup-body"></div></div>
+          <div class="mg-cup" data-cup="1"><canvas class="mg-find-pet-canvas"></canvas><div class="mg-cup-body"></div></div>
+          <div class="mg-cup" data-cup="2"><canvas class="mg-find-pet-canvas"></canvas><div class="mg-cup-body"></div></div>
         </div>
         <div class="mg-foot">
           <button class="mg-back ghost-btn" type="button">‹ Menú</button>

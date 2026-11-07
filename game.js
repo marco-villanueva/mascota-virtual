@@ -560,9 +560,10 @@ const mgTitleEl = document.getElementById("mg-title");
 const mgMenuView = document.getElementById("mg-menu-view");
 const mgTttView = document.getElementById("mg-ttt-view");
 const mgSimonView = document.getElementById("mg-simon-view");
+const mgFindView = document.getElementById("mg-find-view");
 
-const MG_VIEWS = { menu: mgMenuView, ttt: mgTttView, simon: mgSimonView };
-const MG_TITLES = { menu: "🎲 Minijuegos", ttt: "🎯 Tic Tac Toe", simon: "🧠 Simón Dice" };
+const MG_VIEWS = { menu: mgMenuView, ttt: mgTttView, simon: mgSimonView, find: mgFindView };
+const MG_TITLES = { menu: "🎲 Minijuegos", ttt: "🎯 Tic Tac Toe", simon: "🧠 Simón Dice", find: "📦 ¿Dónde está Mochi?" };
 
 function swapView(name) {
   for (const [key, el] of Object.entries(MG_VIEWS)) el.hidden = key !== name;
@@ -596,6 +597,7 @@ function closeMinigames() {
   mgState.open = false;
   mgClearTimers();
   simClearTimers();
+  findClearTimers();
 }
 
 function startRound() {
@@ -946,10 +948,13 @@ mgRestartBtn.addEventListener("click", () => {
 });
 document.getElementById("mg-menu-ttt").addEventListener("click", () => { playSfx("click"); startTicTacToe(); });
 document.getElementById("mg-menu-simon").addEventListener("click", () => { playSfx("click"); startSimon(); });
+document.getElementById("mg-menu-hide").addEventListener("click", () => { playSfx("click"); startFindMatch(); });
 for (const btn of document.querySelectorAll(".mg-back")) {
   btn.addEventListener("click", () => {
     mgClearTimers();
     simClearTimers();
+    findClearTimers();
+    findResetBoard();
     playSfx("click");
     swapView("menu");
   });
@@ -959,6 +964,169 @@ for (const btn of document.querySelectorAll(".mg-exit")) {
 }
 document.getElementById("mg-exit-x").addEventListener("click", closeMinigames);
 mgPads.forEach((pad, i) => pad.addEventListener("click", () => youSimonPad(i)));
+
+// =============================
+// Minigame: Find the pet. Watch which box she hides in,
+// the boxes shuffle, best of 3 — same finale as the other games.
+// =============================
+const FIND_SWAPS = 5; // odd swaps guarantee the arrangement changes
+const FIND_POINTS_TO_WIN = 2;
+
+const findStatusEl = document.getElementById("mg-find-status");
+const findBoardEl = document.getElementById("mg-find-board");
+const findYouEl = document.getElementById("mg-find-you");
+const findPetEl = document.getElementById("mg-find-pet");
+const findNameEl = document.getElementById("mg-find-name");
+const mgCups = Array.from(document.querySelectorAll("#mg-find-board .mg-cup"));
+const mgCupCanvas = mgCups.map((c) => c.querySelector(".mg-find-pet-canvas"));
+
+const findState = {
+  petCup: 0,        // the cup she hides under
+  slotOfCup: [0, 1, 2],
+  phase: "idle",    // idle | reveal | shuffle | pick | result
+  you: 0,
+  pet: 0,
+  round: 1,
+  over: false,
+  timers: [],
+};
+
+function findTimer(fn, ms) {
+  findState.timers.push(setTimeout(() => { if (mgState.open) fn(); }, ms));
+}
+
+function findClearTimers() {
+  for (const t of findState.timers) clearTimeout(t);
+  findState.timers.length = 0;
+}
+
+function findRenderScore(winnerElement) {
+  findYouEl.textContent = findState.you;
+  findPetEl.textContent = findState.pet;
+  const target = winnerElement;
+  if (target) {
+    target.classList.remove("mg-pop");
+    void target.offsetWidth;
+    target.classList.add("mg-pop");
+  }
+}
+
+function findResetBoard() {
+  findClearTimers();
+  findState.slotOfCup = [0, 1, 2];
+  findState.over = false;
+  findState.phase = "idle";
+  mgCups.forEach((cup) => {
+    cup.classList.remove("mg-cup-lift", "mg-cup-reveal");
+    cup.style.setProperty("--slot", findState.slotOfCup[Number(cup.dataset.cup)]);
+  });
+  findBoardEl.classList.remove("pickable", "mg-shake");
+}
+
+function startFindMatch() {
+  findState.you = 0;
+  findState.pet = 0;
+  findState.round = 1;
+  findResetBoard();
+  findNameEl.textContent = settings.name;
+  findRenderScore();
+  swapView("find");
+  findTimer(startFindRound, 350);
+}
+
+function startFindRound() {
+  findResetBoard();
+  findState.petCup = Math.floor(Math.random() * 3);
+  // Give her a fresh portrait in case the player changed character
+  for (const cv of mgCupCanvas) renderPreview(cv, settings.character);
+  // Reveal where she hides, then the shuffle begins
+  findState.phase = "reveal";
+  findStatusEl.textContent = settings.name + " se esconde en una caja... 🫢";
+  findTimer(() => showCup(findState.petCup, true), 250);
+  findTimer(() => {
+    showCup(findState.petCup, false);
+    shuffleCups();
+  }, 1250);
+}
+
+function showCup(i, on) {
+  mgCups[i].classList.toggle("mg-cup-lift", on);
+  mgCups[i].classList.toggle("mg-cup-reveal", on);
+}
+
+function shuffleCups() {
+  findState.phase = "shuffle";
+  findStatusEl.textContent = "Mezclando las cajas... 🌀";
+  playSfx("click");
+  const swapMs = Math.max(310, 470 - findState.round * 50); // a bit faster every round
+  for (let s = 0; s < FIND_SWAPS; s++) {
+    findTimer(doOneSwap, 350 + s * swapMs);
+  }
+  findTimer(() => {
+    findState.phase = "pick";
+    findBoardEl.classList.add("pickable");
+    findStatusEl.textContent = "¿Dónde está " + settings.name + "? ¡Toca una caja!";
+  }, 350 + FIND_SWAPS * swapMs + 250);
+}
+
+function doOneSwap() {
+  const slots = [0, 1, 2];
+  const a = slots.splice(Math.floor(Math.random() * 3), 1)[0];
+  const b = slots.splice(Math.floor(Math.random() * 2), 1)[0];
+  const cupA = findState.slotOfCup.indexOf(a);
+  const cupB = findState.slotOfCup.indexOf(b);
+  findState.slotOfCup[cupA] = b;
+  findState.slotOfCup[cupB] = a;
+  mgCups[cupA].style.setProperty("--slot", b);
+  mgCups[cupB].style.setProperty("--slot", a);
+}
+
+function yourFindPick(i) {
+  if (!mgState.open || findState.phase !== "pick") return;
+  findState.phase = "result";
+  findBoardEl.classList.remove("pickable");
+  const correct = i === findState.petCup;
+  if (correct) {
+    showCup(i, true);
+    playSfx("play", 1.2);
+    playSfx("click");
+    findState.you++;
+    findStatusEl.textContent = "¡La encontraste! 🎉";
+    findRenderScore(findYouEl);
+  } else {
+    showCup(findState.petCup, true);
+    playTone(110, 0.4, "square"); // playful buzz, same as Simón
+    findBoardEl.classList.remove("mg-shake");
+    void findBoardEl.offsetWidth;
+    findBoardEl.classList.add("mg-shake");
+    findState.pet++;
+    findStatusEl.textContent = "¡Oh no... aquí estaba! 🐾";
+    findRenderScore(findPetEl);
+  }
+  findTimer(() => {
+    showCup(correct ? i : findState.petCup, false);
+    if (findState.you >= FIND_POINTS_TO_WIN || findState.pet >= FIND_POINTS_TO_WIN) {
+      findFinish(findState.you >= FIND_POINTS_TO_WIN);
+    } else {
+      findState.round++;
+      findTimer(startFindRound, 320);
+    }
+  }, 1500);
+}
+
+function findFinish(youWon) {
+  findClearTimers();
+  findState.over = true;
+  findState.phase = "idle";
+  findStatusEl.textContent = youWon
+    ? "🎉 ¡Ganaste! ¡Gran olfato!"
+    : settings.name + " gana por fin 🐾 ¡será la próxima!";
+  findTimer(() => finishMatchAfter(youWon), 1800);
+}
+
+for (const cup of mgCups) {
+  cup.addEventListener("click", () => yourFindPick(Number(cup.dataset.cup)));
+}
 
 function clean() {
   if (busy() || pet.dead || pet.sleeping || evol.stage === "egg" || STATS.hygiene >= 99) return;

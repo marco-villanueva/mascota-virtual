@@ -593,6 +593,64 @@ body {
   box-shadow: 0 0 20px var(--glow), inset 0 0 0 3px rgba(255, 255, 255, 0.65);
 }
 
+/* --- Find the pet under the boxes --- */
+.mg-find-board {
+  position: relative;
+  height: 158px;
+  width: min(86vw, 300px);
+  margin: 0 auto 12px;
+}
+
+.mg-find-board.mg-shake { animation: mg-shake 0.5s ease; }
+
+.mg-cup {
+  position: absolute;
+  bottom: 0;
+  width: 29%;
+  left: calc(var(--slot, 0) * 35.5% + 1%);
+  cursor: default;
+}
+
+.mg-cup-body {
+  position: relative;
+  height: 86px;
+  border-radius: 46% 46% 14px 14px;
+  background: linear-gradient(180deg, #f7a8c9 0%, #e78ab2 100%);
+  box-shadow: inset 0 -6px 10px rgba(60, 30, 60, 0.18), inset 6px 6px 14px rgba(255, 255, 255, 0.5), 0 5px 10px rgba(60, 30, 60, 0.2);
+  transition: transform 0.28s cubic-bezier(.5, 1.5, .6, 1);
+}
+
+.mg-cup-body::before { /* kawaii knob on top */
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 26px;
+  height: 14px;
+  border-radius: 99px;
+  transform: translateX(-50%);
+  background: #f78fb8;
+  box-shadow: inset 0 -3px 4px rgba(60, 30, 60, 0.18);
+}
+
+.mg-cup.mg-cup-lift .mg-cup-body { transform: translateY(-34px); }
+
+.mg-find-board.pickable .mg-cup { cursor: pointer; }
+.mg-find-board.pickable .mg-cup:hover .mg-cup-body { transform: translateY(-8px); }
+
+.mg-cup .mg-find-pet-canvas {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 34px;
+  width: 56px;
+  height: 56px;
+  opacity: 0;
+  transition: opacity 0.2s 0.1s;
+}
+
+.mg-cup.mg-cup-reveal .mg-find-pet-canvas { opacity: 1; }
+
 .mg-sub {
   text-align: center;
   color: var(--ink-soft);
