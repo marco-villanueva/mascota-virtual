@@ -67,7 +67,7 @@
       <button id="btn-play" class="action-btn">🎾<span>Jugar</span></button>
       <button id="btn-clean" class="action-btn">🚿<span>Ducha</span></button>
       <button id="btn-sleep" class="action-btn">🌙<span>Dormir</span></button>
-      <button id="btn-minigames" class="action-btn minigame-btn" title="Se desbloquea con todas las barritas al 90%">🎲<span>Juegos</span></button>
+      <button id="btn-minigames" class="action-btn minigame-btn" title="Se desbloquea con todas las barritas al 80%">🎲<span>Juegos</span></button>
     </section>
 
     <p class="hint">Teclas rápidas: <kbd>F</kbd> <kbd>P</kbd> <kbd>C</kbd> <kbd>S</kbd> <kbd>G</kbd> — F abre el menú de comida, P los minijuegos y un clic en tu mascota la saluda</p>
@@ -103,33 +103,78 @@
   <div id="minigame" class="modal" hidden>
     <div class="modal-card mg-card">
       <div class="modal-head">
-        <h2>🎲 Tic Tac Toe</h2>
+        <h2 id="mg-title">🎲 Minijuegos</h2>
         <button id="mg-exit-x" class="close" type="button" aria-label="Salir">✕</button>
       </div>
-      <p class="mg-sub">El mejor de 3 — gana quien llegue a 2 rondas</p>
-      <div class="mg-score">
-        <span class="mg-side you">Tú ✕</span>
-        <b id="mg-score-you">0</b>
-        <em>:</em>
-        <b id="mg-score-pet">0</b>
-        <span class="mg-side pet">○ <span id="mg-score-name">Mochi</span></span>
+
+      <!-- Game picker -->
+      <div id="mg-menu-view">
+        <p class="mg-sub">¿A qué jugamos hoy?</p>
+        <div class="mg-menu">
+          <button class="mg-menu-item" id="mg-menu-ttt" type="button">
+            <span class="mg-menu-emoji" aria-hidden="true">⭕❌</span>
+            <b>Tic Tac Toe</b>
+            <span class="mg-menu-desc">Duelo contra <span class="mg-menu-name">Mochi</span>, mejor de 3</span>
+          </button>
+          <button class="mg-menu-item" id="mg-menu-simon" type="button">
+            <span class="mg-menu-emoji" aria-hidden="true">🧠</span>
+            <b>Simón Dice</b>
+            <span class="mg-menu-desc">Repite la secuencia de <span class="mg-menu-name">Mochi</span></span>
+          </button>
+        </div>
+        <div class="mg-foot">
+          <button class="mg-exit danger-btn secondary" type="button">Salir</button>
+        </div>
       </div>
-      <p id="mg-status" class="mg-status"></p>
-      <div id="mg-board" class="mg-board">
-        <div id="mg-line" class="mg-line" hidden></div>
-        <button class="mg-cell" type="button"></button>
-        <button class="mg-cell" type="button"></button>
-        <button class="mg-cell" type="button"></button>
-        <button class="mg-cell" type="button"></button>
-        <button class="mg-cell" type="button"></button>
-        <button class="mg-cell" type="button"></button>
-        <button class="mg-cell" type="button"></button>
-        <button class="mg-cell" type="button"></button>
-        <button class="mg-cell" type="button"></button>
+
+      <!-- Game: Tic Tac Toe -->
+      <div id="mg-ttt-view" hidden>
+        <p class="mg-sub">El mejor de 3 — gana quien llegue a 2 rondas</p>
+        <div class="mg-score">
+          <span class="mg-side you">Tú ✕</span>
+          <b id="mg-score-you">0</b>
+          <em>:</em>
+          <b id="mg-score-pet">0</b>
+          <span class="mg-side pet">○ <span id="mg-score-name">Mochi</span></span>
+        </div>
+        <p id="mg-status" class="mg-status"></p>
+        <div id="mg-board" class="mg-board">
+          <div id="mg-line" class="mg-line" hidden></div>
+          <button class="mg-cell" type="button"></button>
+          <button class="mg-cell" type="button"></button>
+          <button class="mg-cell" type="button"></button>
+          <button class="mg-cell" type="button"></button>
+          <button class="mg-cell" type="button"></button>
+          <button class="mg-cell" type="button"></button>
+          <button class="mg-cell" type="button"></button>
+          <button class="mg-cell" type="button"></button>
+          <button class="mg-cell" type="button"></button>
+        </div>
+        <div class="mg-foot">
+          <button id="mg-restart" class="ghost-btn" type="button" hidden>🔄 Otra revancha</button>
+          <button class="mg-back ghost-btn" type="button">‹ Menú</button>
+          <button class="mg-exit danger-btn secondary" type="button">Salir</button>
+        </div>
       </div>
-      <div class="mg-foot">
-        <button id="mg-restart" class="ghost-btn" type="button" hidden>🔄 Otra revancha</button>
-        <button id="mg-exit" class="danger-btn secondary" type="button">Salir</button>
+
+      <!-- Game: Simón Dice -->
+      <div id="mg-simon-view" hidden>
+        <p class="mg-sub">Repite la secuencia, crece un paso cada ronda</p>
+        <div class="mg-simon-hud">
+          <span id="mg-sim-level"></span>
+          <span id="mg-sim-lives"></span>
+        </div>
+        <p id="mg-sim-status" class="mg-status"></p>
+        <div id="mg-sim-board" class="mg-sim-board">
+          <button class="mg-pad" data-pad="0" type="button" aria-label="Pad verde"></button>
+          <button class="mg-pad" data-pad="1" type="button" aria-label="Pad rosa"></button>
+          <button class="mg-pad" data-pad="2" type="button" aria-label="Pad azul"></button>
+          <button class="mg-pad" data-pad="3" type="button" aria-label="Pad dorado"></button>
+        </div>
+        <div class="mg-foot">
+          <button class="mg-back ghost-btn" type="button">‹ Menú</button>
+          <button class="mg-exit danger-btn secondary" type="button">Salir</button>
+        </div>
       </div>
     </div>
   </div>

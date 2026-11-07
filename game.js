@@ -553,19 +553,41 @@ function allStatsAtLeast(n) {
   return STATS.hunger >= n && STATS.happiness >= n && STATS.energy >= n && STATS.hygiene >= n;
 }
 
+// Unlock threshold for the magic minigames button
+const MINIGAME_UNLOCK = 80;
+
+const mgTitleEl = document.getElementById("mg-title");
+const mgMenuView = document.getElementById("mg-menu-view");
+const mgTttView = document.getElementById("mg-ttt-view");
+const mgSimonView = document.getElementById("mg-simon-view");
+
+const MG_VIEWS = { menu: mgMenuView, ttt: mgTttView, simon: mgSimonView };
+const MG_TITLES = { menu: "🎲 Minijuegos", ttt: "🎯 Tic Tac Toe", simon: "🧠 Simón Dice" };
+
+function swapView(name) {
+  for (const [key, el] of Object.entries(MG_VIEWS)) el.hidden = key !== name;
+  mgTitleEl.textContent = MG_TITLES[name];
+}
+
 function openMinigames() {
-  if (busy() || pet.dead || pet.sleeping || evol.stage === "egg" || !allStatsAtLeast(90)) return;
+  if (busy() || pet.dead || pet.sleeping || evol.stage === "egg" || !allStatsAtLeast(MINIGAME_UNLOCK)) return;
   hideFoodMenu();
   hideGameMenu();
   mgState.open = true;
+  mgEl.hidden = false;
+  playSfx("click");
+  swapView("menu");
+}
+
+// Enters the Tic Tac Toe match (fresh score each time you pick it)
+function startTicTacToe() {
   mgState.you = 0;
   mgState.pet = 0;
   mgState.round = 1;
   mgScoreNameEl.textContent = settings.name;
   renderScore();
   mgRestartBtn.hidden = true;
-  mgEl.hidden = false;
-  playSfx("click");
+  swapView("ttt");
   startRound();
 }
 
@@ -573,6 +595,7 @@ function closeMinigames() {
   mgEl.hidden = true;
   mgState.open = false;
   mgClearTimers();
+  simClearTimers();
 }
 
 function startRound() {
@@ -764,6 +787,154 @@ function danceMotion(e) {
 
 mgCells.forEach((cell, i) => cell.addEventListener("click", () => youMove(i)));
 
+// =============================
+// Minigame: Simón Dice. Repeat the pet's growing sequence
+// with 2 lives; same rewards and love-dance finale as Tic Tac Toe.
+// =============================
+const SIM_TONES = [329.63, 261.63, 392.0, 523.25]; // E4, C4, G4, C5
+const SIM_LIVES = 2;
+const SIM_MAX_LEN = 5; // the fourth round (2, 3, 4, then 5 steps) wins the match
+
+const simStatusEl = document.getElementById("mg-sim-status");
+const simLevelEl = document.getElementById("mg-sim-level");
+const simLivesEl = document.getElementById("mg-sim-lives");
+const simBoardEl = document.getElementById("mg-sim-board");
+const mgPads = Array.from(document.querySelectorAll("#mg-sim-board .mg-pad"));
+
+const simState = {
+  seq: [],
+  pos: 0,
+  lives: SIM_LIVES,
+  phase: "idle", // idle | show | input
+  timers: [],
+};
+
+function simTimer(fn, ms) {
+  simState.timers.push(setTimeout(() => { if (mgState.open) fn(); }, ms));
+}
+
+function simClearTimers() {
+  for (const t of simState.timers) clearTimeout(t);
+  simState.timers.length = 0;
+}
+
+// Pure Web Audio beeps: four kawaii tones, no sound files needed.
+let toneCtx = null;
+
+function playTone(freq, dur = 0.3, type = "sine") {
+  if (settings.muted) return;
+  try {
+    toneCtx ??= new (window.AudioContext || window.webkitAudioContext)();
+    if (toneCtx.state === "suspended") toneCtx.resume();
+    const osc = toneCtx.createOscillator();
+    const gain = toneCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    const t0 = toneCtx.currentTime;
+    gain.gain.setValueAtTime(0.001, t0);
+    gain.gain.exponentialRampToValueAtTime(0.22, t0 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    osc.connect(gain).connect(toneCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+  } catch { /* audio unavailable — fine */ }
+}
+
+function updateSimLives() {
+  simLivesEl.textContent = "❤️".repeat(Math.max(0, simState.lives))
+    + "🤍".repeat(Math.max(0, SIM_LIVES - simState.lives));
+}
+
+function startSimon() {
+  mgClearTimers();
+  simClearTimers();
+  // Medium level: the match opens with a 2-step sequence
+  simState.seq = [Math.floor(Math.random() * 4)];
+  simState.pos = 0;
+  simState.lives = SIM_LIVES;
+  simState.phase = "idle";
+  updateSimLives();
+  simLevelEl.textContent = "Ronda 1 de 4 · 2 pasos";
+  simStatusEl.textContent = "Escucha con atención... 👂";
+  swapView("simon");
+  simTimer(nextSimonLevel, 800);
+}
+
+// The sequence grows by one random step each round, keeping previous ones
+function nextSimonLevel() {
+  simState.seq.push(Math.floor(Math.random() * 4));
+  simState.pos = 0;
+  simLevelEl.textContent = "Ronda " + (simState.seq.length - 1) + " de 4 · " + simState.seq.length + " pasos";
+  playSequence();
+}
+
+function playSequence() {
+  simState.phase = "show";
+  for (const p of mgPads) p.disabled = true;
+  simStatusEl.textContent = settings.name + " está tocando... 👂";
+  const lightMs = Math.max(300, 430 - simState.seq.length * 30); // a touch faster as rounds pass
+  const gapMs = 160;
+  simState.seq.forEach((pad, i) => {
+    simTimer(() => activatePad(pad, lightMs), i * (lightMs + gapMs));
+  });
+  simTimer(() => {
+    simState.phase = "input";
+    for (const p of mgPads) p.disabled = false;
+    simStatusEl.textContent = "¡Tu turno! Repite la secuencia";
+  }, simState.seq.length * (lightMs + gapMs) + 120);
+}
+
+function activatePad(i, lightMs = 240) {
+  const pad = mgPads[i];
+  pad.classList.add("mg-pad-on");
+  playTone(SIM_TONES[i]);
+  setTimeout(() => pad.classList.remove("mg-pad-on"), lightMs);
+}
+
+function youSimonPad(i) {
+  if (!mgState.open || simState.phase !== "input") return;
+  activatePad(i);
+  if (i !== simState.seq[simState.pos]) {
+    simState.lives--;
+    updateSimLives();
+    simState.phase = "idle";
+    for (const p of mgPads) p.disabled = true;
+    playTone(110, 0.4, "square"); // playful buzz
+    simBoardEl.classList.remove("mg-shake");
+    void simBoardEl.offsetWidth;
+    simBoardEl.classList.add("mg-shake");
+    if (simState.lives <= 0) {
+      simStatusEl.textContent = "¡Ups! Se acabaron los corazones...";
+      simTimer(() => simFinish(false), 1000);
+    } else {
+      simStatusEl.textContent = "¡Ups! Esa no era 💦 Repetirá otra vez...";
+      simTimer(() => { simState.pos = 0; playSequence(); }, 1200);
+    }
+    return;
+  }
+  simState.pos++;
+  if (simState.pos < simState.seq.length) return;
+  // Sequence completed
+  simState.phase = "idle";
+  for (const p of mgPads) p.disabled = true;
+  if (simState.seq.length >= SIM_MAX_LEN) {
+    simStatusEl.textContent = "🎉 ¡Memoria de elefante!";
+    simTimer(() => simFinish(true), 1000);
+  } else {
+    simStatusEl.textContent = "✨ ¡Bien! Mochi agrega un paso...";
+    simTimer(nextSimonLevel, 1400);
+  }
+}
+
+function simFinish(youWon) {
+  simClearTimers();
+  simState.phase = "idle";
+  simStatusEl.textContent = youWon
+    ? "🎉 ¡Ganaste Simón Dice!"
+    : settings.name + " gana Simón Dice 🐾 ¡será la próxima!";
+  simTimer(() => finishMatchAfter(youWon), 1800);
+}
+
 buttons.minigames.addEventListener("click", openMinigames);
 mgRestartBtn.addEventListener("click", () => {
   playSfx("click");
@@ -773,8 +944,21 @@ mgRestartBtn.addEventListener("click", () => {
   renderScore();
   startRound();
 });
-document.getElementById("mg-exit").addEventListener("click", () => { playSfx("click"); closeMinigames(); });
+document.getElementById("mg-menu-ttt").addEventListener("click", () => { playSfx("click"); startTicTacToe(); });
+document.getElementById("mg-menu-simon").addEventListener("click", () => { playSfx("click"); startSimon(); });
+for (const btn of document.querySelectorAll(".mg-back")) {
+  btn.addEventListener("click", () => {
+    mgClearTimers();
+    simClearTimers();
+    playSfx("click");
+    swapView("menu");
+  });
+}
+for (const btn of document.querySelectorAll(".mg-exit")) {
+  btn.addEventListener("click", () => { playSfx("click"); closeMinigames(); });
+}
 document.getElementById("mg-exit-x").addEventListener("click", closeMinigames);
+mgPads.forEach((pad, i) => pad.addEventListener("click", () => youSimonPad(i)));
 
 function clean() {
   if (busy() || pet.dead || pet.sleeping || evol.stage === "egg" || STATS.hygiene >= 99) return;
@@ -811,8 +995,8 @@ function updateButtonsState() {
   const egg = evol.stage === "egg";
   const sleeping = pet.sleeping;
   const dead = pet.dead;
-  // The 5th button only lights up with every bar at 90% or more
-  const all90 = allStatsAtLeast(90);
+  // The 5th button only lights up with every bar at the unlock threshold or more
+  const all90 = allStatsAtLeast(MINIGAME_UNLOCK);
   buttons.feed.disabled = egg || dead || sleeping || busy();
   buttons.play.disabled = egg || dead || sleeping || busy() || STATS.energy < 12;
   buttons.clean.disabled = egg || dead || sleeping || busy();
